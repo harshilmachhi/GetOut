@@ -57,9 +57,9 @@ struct SpotDetailView: View {
 
     private var heroSection: some View {
         ZStack(alignment: .top) {
-            // placeholder hero image
-            CategoryGradientView(category: spot.categoryEnum, startPoint: .top, endPoint: .bottom)
+            SpotImage(spot: spot, startPoint: .top, endPoint: .bottom)
                 .frame(height: heroHeight)
+                .clipped()
 
             VStack {
                 HStack {
@@ -95,7 +95,7 @@ struct SpotDetailView: View {
                 Spacer()
 
                 LinearGradient(
-                    colors: [.clear, Color.black.opacity(0.75)],
+                    colors: [.clear, Color.black.opacity(0.85)],
                     startPoint: .top,
                     endPoint: .bottom
                 )

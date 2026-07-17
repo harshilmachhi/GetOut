@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "spot_sunset_hill.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

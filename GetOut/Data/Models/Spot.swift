@@ -14,6 +14,7 @@ final class Spot {
     var neighborhood: String = ""
     var category: String = SpotCategory.views.rawValue
     var photoSystemImage: String = "photo"
+    @Attribute(.externalStorage) var photoData: Data?
     var rating: Double = 0
     var createdAt: Date = Date.now
 

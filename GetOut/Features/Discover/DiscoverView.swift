@@ -33,7 +33,10 @@ struct DiscoverView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HeroHeader(displayName: demoProfile?.displayName ?? "Harshil")
+                HeroHeader(
+                    displayName: demoProfile?.displayName ?? "Harshil",
+                    heroSpot: allSpots.first
+                )
 
                 CategoryChipsRow(
                     categories: categories,
@@ -84,6 +87,7 @@ struct DiscoverView: View {
 
 private struct HeroHeader: View {
     let displayName: String
+    let heroSpot: Spot?
 
     private let heroHeight: CGFloat = 420
     private let heroCharcoal = Color.black.opacity(0.85)
@@ -111,11 +115,28 @@ private struct HeroHeader: View {
 
     private var heroBackground: some View {
         ZStack(alignment: .bottom) {
+            Group {
+                if let heroSpot {
+                    SpotImage(spot: heroSpot, startPoint: .top, endPoint: .bottom)
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.98, green: 0.82, blue: 0.72),
+                            Color(red: 0.96, green: 0.90, blue: 0.78),
+                            Color(red: 0.72, green: 0.78, blue: 0.62),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                }
+            }
+            .frame(height: heroHeight)
+
             LinearGradient(
                 colors: [
-                    Color(red: 0.98, green: 0.82, blue: 0.72),
-                    Color(red: 0.96, green: 0.90, blue: 0.78),
-                    Color(red: 0.72, green: 0.78, blue: 0.62),
+                    Color(red: 0.98, green: 0.82, blue: 0.72).opacity(0.55),
+                    Color(red: 0.96, green: 0.90, blue: 0.78).opacity(0.45),
+                    Color.black.opacity(0.35),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -332,8 +353,9 @@ private struct SpotCard: View {
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .top) {
-                CategoryGradientView(category: spot.categoryEnum, fallbackIndex: gradientIndex)
+                SpotImage(spot: spot, fallbackIndex: gradientIndex)
                     .frame(width: 240, height: 300)
+                    .clipped()
 
                 VStack {
                     HStack {

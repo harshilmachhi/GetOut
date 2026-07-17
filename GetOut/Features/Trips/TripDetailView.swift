@@ -273,8 +273,9 @@ private struct TripStopRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: Theme.Spacing.md) {
-                CategoryGradientView(category: spot.categoryEnum)
+                SpotImage(spot: spot)
                     .frame(width: 52, height: 52)
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
 
                 VStack(alignment: .leading, spacing: 2) {

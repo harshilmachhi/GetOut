@@ -96,8 +96,9 @@ private struct SpotPickerRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            CategoryGradientView(category: spot.categoryEnum)
+            SpotImage(spot: spot)
                 .frame(width: 48, height: 48)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
 
             VStack(alignment: .leading, spacing: 2) {

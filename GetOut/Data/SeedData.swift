@@ -1,13 +1,24 @@
 import Foundation
 import SwiftData
+import UIKit
 
 enum SeedData {
+    private static let spotPhotoAssetNames: [String: String] = [
+        "Sunset hill seating": "spot_sunset_hill",
+        "Hidden cafe in the garden": "spot_hidden_cafe",
+        "East River quiet spot": "spot_east_river",
+        "Rooftop reading nook": "spot_rooftop_nook",
+        "Late-night dumpling counter": "spot_dumpling",
+        "Prospect Park knoll": "spot_prospect_park",
+    ]
+
     static func seedIfNeeded(in context: ModelContext) {
         var descriptor = FetchDescriptor<Spot>()
         descriptor.fetchLimit = 1
         guard (try? context.fetch(descriptor).isEmpty) == true else {
             seedSampleTripIfNeeded(in: context)
             seedProfileEngagementIfNeeded(in: context)
+            backfillSpotPhotosIfNeeded(in: context)
             return
         }
 
@@ -50,6 +61,7 @@ enum SeedData {
             spot.latitude = spec.lat
             spot.longitude = spec.lon
             spot.photoSystemImage = spec.photo
+            spot.photoData = photoData(forTitle: spec.title)
             spot.owner = profile
             spot.tags = spec.tagNames.compactMap { tagsByName[$0] }
             context.insert(spot)
@@ -61,6 +73,28 @@ enum SeedData {
         seedProfileEngagementIfNeeded(in: context)
 
         try? context.save()
+    }
+
+    static func backfillSpotPhotosIfNeeded(in context: ModelContext) {
+        guard let spots = try? context.fetch(FetchDescriptor<Spot>()) else { return }
+
+        var didUpdate = false
+        for spot in spots {
+            guard spot.photoData == nil,
+                  let data = photoData(forTitle: spot.title) else { continue }
+            spot.photoData = data
+            didUpdate = true
+        }
+
+        if didUpdate {
+            try? context.save()
+        }
+    }
+
+    private static func photoData(forTitle title: String) -> Data? {
+        guard let assetName = spotPhotoAssetNames[title],
+              let image = UIImage(named: assetName) else { return nil }
+        return image.jpegData(compressionQuality: 0.85)
     }
 
     static func seedProfileEngagementIfNeeded(in context: ModelContext) {

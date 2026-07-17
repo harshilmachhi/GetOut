@@ -1,7 +1,9 @@
 import CoreLocation
 import MapKit
+import PhotosUI
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct AddSpotView: View {
     @Environment(\.modelContext) private var modelContext
@@ -26,6 +28,9 @@ struct AddSpotView: View {
     @State private var showSuccess = false
     @State private var geocodeTask: Task<Void, Never>?
 
+    @State private var photoPickerItem: PhotosPickerItem?
+    @State private var photoData: Data?
+
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedCoordinate != nil
     }
@@ -39,6 +44,7 @@ struct AddSpotView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                     whatsTheSpotSection
+                    photoSection
                     categorySection
                     whereSection
                     tagsSection
@@ -63,6 +69,9 @@ struct AddSpotView: View {
         .onChange(of: locationManager.lastLocation) { _, _ in
             updateCameraIfNeeded()
         }
+        .onChange(of: photoPickerItem) { _, newItem in
+            loadPhoto(from: newItem)
+        }
     }
 
     // MARK: - Sections
@@ -78,6 +87,59 @@ struct AddSpotView: View {
                 TextField("What makes it special?", text: $details, axis: .vertical)
                     .lineLimit(3...6)
                     .cardInputStyle()
+            }
+        }
+    }
+
+    private var photoSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            SectionHeader(title: "Photo")
+
+            HStack(spacing: Theme.Spacing.md) {
+                Group {
+                    if let photoData, let uiImage = UIImage(data: photoData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        ZStack {
+                            CategoryGradientView(category: selectedCategory)
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                        }
+                    }
+                }
+                .frame(width: 88, height: 88)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                        Label(photoData == nil ? "Choose photo" : "Change photo", systemImage: "photo.on.rectangle")
+                            .font(Theme.Typography.caption().weight(.medium))
+                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                            .padding(.horizontal, Theme.Spacing.md)
+                            .padding(.vertical, Theme.Spacing.sm)
+                            .background(Theme.Colors.cardSurface)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    if photoData != nil {
+                        Button {
+                            photoPickerItem = nil
+                            photoData = nil
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                                .font(Theme.Typography.caption().weight(.medium))
+                                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Spacer(minLength: 0)
             }
         }
     }
@@ -322,6 +384,7 @@ struct AddSpotView: View {
         spot.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
         spot.category = selectedCategory.rawValue
         spot.rating = 0
+        spot.photoData = photoData
         spot.owner = profile
         spot.createdAt = .now
 
@@ -362,6 +425,41 @@ struct AddSpotView: View {
         details = ""
         selectedTagNames = []
         newTagName = ""
+        photoPickerItem = nil
+        photoData = nil
+    }
+
+    private func loadPhoto(from item: PhotosPickerItem?) {
+        guard let item else {
+            photoData = nil
+            return
+        }
+
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            let processed = downscaledJPEG(from: data)
+            await MainActor.run {
+                photoData = processed
+            }
+        }
+    }
+
+    private func downscaledJPEG(from data: Data, maxDimension: CGFloat = 1600, quality: CGFloat = 0.85) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+
+        let size = image.size
+        let maxSide = max(size.width, size.height)
+        guard maxSide > maxDimension else {
+            return image.jpegData(compressionQuality: quality)
+        }
+
+        let scale = maxDimension / maxSide
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        return resized.jpegData(compressionQuality: quality)
     }
 }
 

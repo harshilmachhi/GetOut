@@ -247,8 +247,9 @@ private struct ProfileSpotTile: View {
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .bottom) {
-                CategoryGradientView(category: spot.categoryEnum, fallbackIndex: gradientIndex)
+                SpotImage(spot: spot, fallbackIndex: gradientIndex)
                     .frame(height: 120)
+                    .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
 
                 LinearGradient(
@@ -292,7 +293,12 @@ private struct ProfileCitiesList: View {
         } else {
             VStack(spacing: Theme.Spacing.sm) {
                 ForEach(Array(cityGroups.enumerated()), id: \.element.city) { index, group in
-                    ProfileCityRow(city: group.city, spotCount: group.spots.count, gradientIndex: index)
+                    ProfileCityRow(
+                        city: group.city,
+                        spotCount: group.spots.count,
+                        representativeSpot: group.spots.first,
+                        gradientIndex: index
+                    )
                 }
             }
         }
@@ -302,17 +308,26 @@ private struct ProfileCitiesList: View {
 private struct ProfileCityRow: View {
     let city: String
     let spotCount: Int
+    let representativeSpot: Spot?
     let gradientIndex: Int
 
     private var representativeCategory: SpotCategory {
-        SpotCategory.allCases[gradientIndex % SpotCategory.allCases.count]
+        representativeSpot?.categoryEnum
+            ?? SpotCategory.allCases[gradientIndex % SpotCategory.allCases.count]
     }
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            CategoryGradientView(category: representativeCategory, fallbackIndex: gradientIndex)
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+            Group {
+                if let representativeSpot {
+                    SpotImage(spot: representativeSpot, fallbackIndex: gradientIndex)
+                } else {
+                    CategoryGradientView(category: representativeCategory, fallbackIndex: gradientIndex)
+                }
+            }
+            .frame(width: 56, height: 56)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
 
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 Text(city)
