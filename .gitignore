@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Xcode
+*.xcodeproj
+xcuserdata/
+DerivedData/
+build/
+
+# Swift Package Manager
+.swiftpm/
+
+# Xcode user state
+*.xcuserstate
+*.xcscmblueprint
+
+# Design: keep the reference mockup + docs, ignore generated milestone screenshots
+design/*.png
+!design/reference-home.png
