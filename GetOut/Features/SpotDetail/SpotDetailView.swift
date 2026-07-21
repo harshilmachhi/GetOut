@@ -36,12 +36,15 @@ struct SpotDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                heroSection
+        GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    heroSection(topInset: geo.safeAreaInsets.top)
 
-                contentSection
+                    contentSection
+                }
             }
+            .ignoresSafeArea(edges: .top)
         }
         .background(Theme.Colors.appBackground)
         .toolbar(.hidden, for: .navigationBar)
@@ -55,7 +58,7 @@ struct SpotDetailView: View {
 
     // MARK: - Hero
 
-    private var heroSection: some View {
+    private func heroSection(topInset: CGFloat) -> some View {
         ZStack(alignment: .top) {
             SpotImage(spot: spot, startPoint: .top, endPoint: .bottom)
                 .frame(height: heroHeight)
@@ -90,7 +93,7 @@ struct SpotDetailView: View {
                     .buttonStyle(.plain)
                 }
                 .padding(.horizontal, Theme.Spacing.md)
-                .padding(.top, Theme.Spacing.sm)
+                .padding(.top, topInset + Theme.Spacing.sm)
 
                 Spacer()
 
@@ -116,6 +119,7 @@ struct SpotDetailView: View {
             }
             .frame(height: heroHeight)
         }
+        .frame(height: heroHeight)
     }
 
     private var heroLocationLine: String {

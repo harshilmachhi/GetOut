@@ -17,6 +17,8 @@ struct DiscoverView: View {
 
     @State private var selectedCategory: SpotCategory = .nearby
     @State private var showMapExplore = false
+    @State private var showSearch = false
+    @State private var openSearchFiltersOnAppear = false
     @State private var selectedSpot: Spot?
 
     private var categories: [CategoryChip] {
@@ -31,38 +33,56 @@ struct DiscoverView: View {
     private var demoProfile: Profile? { demoProfiles.first }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                HeroHeader(
-                    displayName: demoProfile?.displayName ?? "Harshil",
-                    heroSpot: allSpots.first
-                )
+        GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    HeroHeader(
+                        displayName: demoProfile?.displayName ?? "Harshil",
+                        heroSpot: allSpots.first,
+                        topInset: geo.safeAreaInsets.top,
+                        onSearchTap: {
+                            openSearchFiltersOnAppear = false
+                            showSearch = true
+                        },
+                        onFilterTap: {
+                            openSearchFiltersOnAppear = true
+                            showSearch = true
+                        }
+                    )
 
-                CategoryChipsRow(
-                    categories: categories,
-                    selectedCategory: $selectedCategory
-                )
-                .padding(.top, Theme.Spacing.lg)
+                    CategoryChipsRow(
+                        categories: categories,
+                        selectedCategory: $selectedCategory
+                    )
+                    .padding(.top, Theme.Spacing.lg)
 
-                ForYouNearbySection(
-                    spots: filteredSpots,
-                    demoProfile: demoProfile,
-                    onToggleLike: toggleLike,
-                    onSelectSpot: { selectedSpot = $0 }
-                )
-                .padding(.top, Theme.Spacing.xl)
+                    ForYouNearbySection(
+                        spots: filteredSpots,
+                        demoProfile: demoProfile,
+                        onToggleLike: toggleLike,
+                        onSelectSpot: { selectedSpot = $0 }
+                    )
+                    .padding(.top, Theme.Spacing.xl)
 
-                ExploreMapSection(spots: allSpots) {
-                    showMapExplore = true
+                    ExploreMapSection(spots: allSpots) {
+                        showMapExplore = true
+                    }
+                    .padding(.top, Theme.Spacing.xl)
                 }
-                .padding(.top, Theme.Spacing.xl)
+                .padding(.bottom, 96)
             }
-            .padding(.bottom, 96)
+            .ignoresSafeArea(edges: .top)
         }
         .background(Theme.Colors.appBackground)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $selectedSpot) { spot in
             SpotDetailView(spot: spot)
+        }
+        .navigationDestination(isPresented: $showSearch) {
+            SearchView(openFiltersOnAppear: openSearchFiltersOnAppear)
+                .onDisappear {
+                    openSearchFiltersOnAppear = false
+                }
         }
         .fullScreenCover(isPresented: $showMapExplore) {
             MapExploreView()
@@ -88,32 +108,33 @@ struct DiscoverView: View {
 private struct HeroHeader: View {
     let displayName: String
     let heroSpot: Spot?
+    let topInset: CGFloat
+    let onSearchTap: () -> Void
+    let onFilterTap: () -> Void
 
-    private let heroHeight: CGFloat = 420
-    private let heroCharcoal = Color.black.opacity(0.85)
+    private let heroHeight: CGFloat = 330
     private let heroSubtext = Color.black.opacity(0.7)
 
     var body: some View {
         ZStack(alignment: .top) {
-            heroBackground
+            heroBackground(height: heroHeight)
 
             VStack(alignment: .leading, spacing: 0) {
                 topRow
                     .padding(.top, Theme.Spacing.sm)
-
-                headline
-                    .padding(.top, Theme.Spacing.lg)
 
                 Spacer(minLength: Theme.Spacing.lg)
 
                 searchRow
             }
             .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, topInset)
             .frame(height: heroHeight, alignment: .top)
         }
+        .frame(height: heroHeight)
     }
 
-    private var heroBackground: some View {
+    private func heroBackground(height: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             Group {
                 if let heroSpot {
@@ -130,7 +151,7 @@ private struct HeroHeader: View {
                     )
                 }
             }
-            .frame(height: heroHeight)
+            .frame(height: height)
 
             LinearGradient(
                 colors: [
@@ -141,16 +162,16 @@ private struct HeroHeader: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: heroHeight)
+            .frame(height: height)
 
             LinearGradient(
                 colors: [.clear, Theme.Colors.appBackground],
                 startPoint: .center,
                 endPoint: .bottom
             )
-            .frame(height: heroHeight * 0.55)
+            .frame(height: height * 0.55)
         }
-        .frame(height: heroHeight)
+        .frame(height: height)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
@@ -180,42 +201,26 @@ private struct HeroHeader: View {
         }
     }
 
-    private var headline: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Let's find\nsomewhere\nthat feels like")
-                .font(Theme.Typography.serifDisplay(size: 40))
-                .foregroundStyle(heroCharcoal)
-                .lineSpacing(-4)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("you.")
-                    .font(Theme.Typography.script(size: 46))
-                    .foregroundStyle(Theme.Colors.accentGreen)
-
-                Capsule()
-                    .fill(Theme.Colors.accentGreen)
-                    .frame(width: 52, height: 3)
-            }
-        }
-    }
-
     private var searchRow: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            HStack(spacing: Theme.Spacing.sm) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Color.gray)
+            Button(action: onSearchTap) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(Color.gray)
 
-                Text("Where to next?")
-                    .font(Theme.Typography.body())
-                    .foregroundStyle(Color.gray.opacity(0.85))
+                    Text("Where to next?")
+                        .font(Theme.Typography.body())
+                        .foregroundStyle(Color.gray.opacity(0.85))
+                }
+                .padding(.horizontal, Theme.Spacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 52)
+                .background(Theme.Colors.cream)
+                .clipShape(Capsule())
             }
-            .padding(.horizontal, Theme.Spacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 52)
-            .background(Theme.Colors.cream)
-            .clipShape(Capsule())
+            .buttonStyle(.plain)
 
-            Button {} label: {
+            Button(action: onFilterTap) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Theme.Colors.textOnDarkPrimary)
