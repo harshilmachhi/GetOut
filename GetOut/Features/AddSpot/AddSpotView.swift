@@ -7,9 +7,9 @@ import UIKit
 
 struct AddSpotView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(SessionStore.self) private var session
     @Query(sort: \Tag.name) private var allTags: [Tag]
-    @Query(filter: #Predicate<Profile> { $0.username == "harshil" }) private var demoProfiles: [Profile]
-    @Query private var allProfiles: [Profile]
+    @Query(sort: \Profile.createdAt) private var allProfiles: [Profile]
 
     @State private var locationManager = LocationManager()
     @State private var cameraPosition: MapCameraPosition = .region(LocationManager.defaultRegion)
@@ -18,7 +18,6 @@ struct AddSpotView: View {
 
     @State private var title = ""
     @State private var details = ""
-    @State private var selectedCategory: SpotCategory = .views
     @State private var neighborhood = ""
     @State private var city = ""
     @State private var selectedTagNames: Set<String> = []
@@ -36,18 +35,21 @@ struct AddSpotView: View {
     }
 
     private var demoProfile: Profile? {
-        demoProfiles.first ?? allProfiles.first
+        allProfiles.first { $0.username == session.currentUsername } ?? allProfiles.first
+    }
+
+    private var suggestedTags: [Tag] {
+        allTags.filter { !selectedTagNames.contains($0.name) }
     }
 
     var body: some View {
         ZStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                    whatsTheSpotSection
-                    photoSection
-                    categorySection
-                    whereSection
+                    locationSection
+                    nameAndStorySection
                     tagsSection
+                    photoSection
                     saveButton
                 }
                 .padding(.horizontal, Theme.Spacing.md)
@@ -76,96 +78,13 @@ struct AddSpotView: View {
 
     // MARK: - Sections
 
-    private var whatsTheSpotSection: some View {
+    private var locationSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SectionHeader(title: "What's the spot?")
-
-            VStack(spacing: Theme.Spacing.sm) {
-                TextField("Name this spot", text: $title)
-                    .cardInputStyle()
-
-                TextField("What makes it special?", text: $details, axis: .vertical)
-                    .lineLimit(3...6)
-                    .cardInputStyle()
-            }
-        }
-    }
-
-    private var photoSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SectionHeader(title: "Photo")
-
-            HStack(spacing: Theme.Spacing.md) {
-                Group {
-                    if let photoData, let uiImage = UIImage(data: photoData) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        ZStack {
-                            CategoryGradientView(category: selectedCategory)
-                            Image(systemName: "photo")
-                                .font(.title2)
-                                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
-                        }
-                    }
-                }
-                .frame(width: 88, height: 88)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
-
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                        Label(photoData == nil ? "Choose photo" : "Change photo", systemImage: "photo.on.rectangle")
-                            .font(Theme.Typography.caption().weight(.medium))
-                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                            .padding(.horizontal, Theme.Spacing.md)
-                            .padding(.vertical, Theme.Spacing.sm)
-                            .background(Theme.Colors.cardSurface)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-
-                    if photoData != nil {
-                        Button {
-                            photoPickerItem = nil
-                            photoData = nil
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                                .font(Theme.Typography.caption().weight(.medium))
-                                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-        }
-    }
-
-    private var categorySection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SectionHeader(title: "Category")
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Theme.Spacing.md) {
-                    ForEach(SpotCategory.allCases, id: \.self) { category in
-                        AddSpotCategoryChip(
-                            category: category,
-                            isSelected: selectedCategory == category
-                        ) {
-                            selectedCategory = category
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var whereSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SectionHeader(title: "Where?")
+            stepHeader(
+                number: 1,
+                title: "Location",
+                subtitle: "Drop a pin where this spot is — drag the map to place it."
+            )
 
             ZStack {
                 Map(position: $cameraPosition)
@@ -225,23 +144,45 @@ struct AddSpotView: View {
         }
     }
 
+    private var nameAndStorySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            stepHeader(
+                number: 2,
+                title: "Name & story",
+                subtitle: "Give it a name and tell people what makes it worth the trip."
+            )
+
+            VStack(spacing: Theme.Spacing.sm) {
+                TextField("Name this spot", text: $title)
+                    .cardInputStyle()
+
+                TextField("What makes it special?", text: $details, axis: .vertical)
+                    .lineLimit(3...8)
+                    .cardInputStyle()
+            }
+        }
+    }
+
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SectionHeader(title: "Tags")
+            stepHeader(
+                number: 3,
+                title: "Tags",
+                subtitle: "Type anything — vibes, cuisine, accessibility. Tags power discovery."
+            )
 
-            FlowLayout(spacing: Theme.Spacing.sm, lineSpacing: Theme.Spacing.sm) {
-                ForEach(allTags, id: \.id) { tag in
-                    TagChip(
-                        name: tag.name,
-                        isSelected: selectedTagNames.contains(tag.name)
-                    ) {
-                        toggleTag(tag.name)
+            if !selectedTagNames.isEmpty {
+                FlowLayout(spacing: Theme.Spacing.sm, lineSpacing: Theme.Spacing.sm) {
+                    ForEach(Array(selectedTagNames).sorted(), id: \.self) { name in
+                        RemovableTagChip(name: name) {
+                            selectedTagNames.remove(name)
+                        }
                     }
                 }
             }
 
             HStack(spacing: Theme.Spacing.sm) {
-                TextField("New tag", text: $newTagName)
+                TextField("Add a tag", text: $newTagName)
                     .cardInputStyle()
                     .onSubmit(addNewTag)
 
@@ -255,6 +196,116 @@ struct AddSpotView: View {
                     .buttonStyle(.plain)
                     .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .opacity(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
+            }
+
+            if !suggestedTags.isEmpty {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    Text("Suggestions")
+                        .font(Theme.Typography.caption().weight(.medium))
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+
+                    FlowLayout(spacing: Theme.Spacing.sm, lineSpacing: Theme.Spacing.sm) {
+                        ForEach(suggestedTags, id: \.id) { tag in
+                            SuggestedTagChip(name: tag.name) {
+                                selectedTagNames.insert(tag.name)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var photoSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            stepHeader(
+                number: 4,
+                title: "Photo",
+                subtitle: "A great shot helps others picture the vibe."
+            )
+
+            ZStack(alignment: .topTrailing) {
+                PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                    photoPickerContent
+                }
+                .buttonStyle(.plain)
+
+                if photoData != nil {
+                    Button {
+                        photoPickerItem = nil
+                        photoData = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(Theme.Colors.textOnDarkPrimary, Color.black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(Theme.Spacing.sm)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var photoPickerContent: some View {
+        Group {
+            if let photoData, let uiImage = UIImage(data: photoData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Theme.Colors.cardSurface
+                    VStack(spacing: Theme.Spacing.sm) {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 32))
+                            .foregroundStyle(Theme.Colors.accentGreen)
+
+                        Text("Add photo")
+                            .font(Theme.Typography.body().weight(.medium))
+                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+
+                        Text("Tap to choose from your library")
+                            .font(Theme.Typography.caption())
+                            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 220)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .overlay {
+            if photoData != nil {
+                RoundedRectangle(cornerRadius: Theme.Radius.card)
+                    .fill(
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.55)],
+                            startPoint: .center,
+                            endPoint: .bottom
+                        )
+                    )
+                    .allowsHitTesting(false)
+            } else {
+                RoundedRectangle(cornerRadius: Theme.Radius.card)
+                    .strokeBorder(
+                        Theme.Colors.cream.opacity(0.28),
+                        style: StrokeStyle(lineWidth: 2, dash: [10, 8])
+                    )
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if photoData != nil {
+                Label("Change photo", systemImage: "photo.on.rectangle")
+                    .font(Theme.Typography.caption().weight(.semibold))
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+                    .padding(.bottom, Theme.Spacing.md)
             }
         }
     }
@@ -291,6 +342,28 @@ struct AddSpotView: View {
         .transition(.scale.combined(with: .opacity))
     }
 
+    // MARK: - Step Header
+
+    private func stepHeader(number: Int, title: String, subtitle: String) -> some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            Text("\(number)")
+                .font(Theme.Typography.serifDisplay(size: 28))
+                .foregroundStyle(Theme.Colors.accentGreen)
+                .frame(width: 28, alignment: .trailing)
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(title)
+                    .font(Theme.Typography.sectionHeader())
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+
+                Text(subtitle)
+                    .font(Theme.Typography.caption())
+                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     // MARK: - Actions
 
     private func updateCameraIfNeeded() {
@@ -303,7 +376,7 @@ struct AddSpotView: View {
     }
 
     private func recenterOnUserLocation() {
-        let region = locationManager.defaultMapRegion
+        guard let region = locationManager.centerOnUser() else { return }
         withAnimation {
             cameraPosition = .region(region)
         }
@@ -355,14 +428,6 @@ struct AddSpotView: View {
         }
     }
 
-    private func toggleTag(_ name: String) {
-        if selectedTagNames.contains(name) {
-            selectedTagNames.remove(name)
-        } else {
-            selectedTagNames.insert(name)
-        }
-    }
-
     private func addNewTag() {
         let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -370,10 +435,36 @@ struct AddSpotView: View {
         newTagName = ""
     }
 
+    private func inferredCategory(from tagNames: Set<String>) -> SpotCategory {
+        let aliases: [String: SpotCategory] = [
+            "foodie": .food,
+            "outdoors": .nature,
+            "sunset": .views,
+            "quiet": .nature,
+        ]
+
+        for name in tagNames {
+            let lowered = name.lowercased()
+            if let category = SpotCategory(rawValue: lowered) {
+                return category
+            }
+            if let category = SpotCategory.allCases.first(where: { $0.displayName.lowercased() == lowered }) {
+                return category
+            }
+            if let category = aliases[lowered] {
+                return category
+            }
+        }
+        return .nearby
+    }
+
     private func saveSpot() {
         guard canSave,
               let coordinate = selectedCoordinate,
               let profile = demoProfile else { return }
+
+        let now = Date.now
+        let calendar = Calendar.current
 
         let spot = Spot()
         spot.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -382,11 +473,13 @@ struct AddSpotView: View {
         spot.longitude = coordinate.longitude
         spot.neighborhood = neighborhood.trimmingCharacters(in: .whitespacesAndNewlines)
         spot.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
-        spot.category = selectedCategory.rawValue
+        spot.category = inferredCategory(from: selectedTagNames).rawValue
         spot.rating = 0
         spot.photoData = photoData
+        spot.visitHour = calendar.component(.hour, from: now)
+        spot.visitWeekday = calendar.component(.weekday, from: now)
         spot.owner = profile
-        spot.createdAt = .now
+        spot.createdAt = now
 
         var spotTags: [Tag] = []
         for name in selectedTagNames {
@@ -463,39 +556,42 @@ struct AddSpotView: View {
     }
 }
 
-// MARK: - Category Chip
+// MARK: - Tag Chips
 
-private struct AddSpotCategoryChip: View {
-    let category: SpotCategory
-    let isSelected: Bool
-    let action: () -> Void
+private struct RemovableTagChip: View {
+    let name: String
+    let onRemove: () -> Void
+
+    private var iconName: String? {
+        name == "weed-friendly" ? "leaf.fill" : nil
+    }
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: Theme.Spacing.sm) {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? Theme.Colors.accentGreen : Theme.Colors.cream)
-                    .frame(width: 64, height: 64)
-                    .overlay {
-                        Image(systemName: category.symbolName)
-                            .font(.title3)
-                            .foregroundStyle(isSelected ? Theme.Colors.textOnDarkPrimary : Color.black.opacity(0.75))
-                    }
-
-                Text(category.displayName)
-                    .font(Theme.Typography.caption())
-                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+        HStack(spacing: Theme.Spacing.xs) {
+            if let iconName {
+                Image(systemName: iconName)
+                    .font(.caption2)
             }
+
+            Text(name)
+                .font(Theme.Typography.caption().weight(.medium))
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark")
+                    .font(.caption2.weight(.bold))
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(Theme.Colors.accentGreen)
+        .clipShape(Capsule())
     }
 }
 
-// MARK: - Tag Chip
-
-private struct TagChip: View {
+private struct SuggestedTagChip: View {
     let name: String
-    let isSelected: Bool
     let action: () -> Void
 
     private var iconName: String? {
@@ -513,16 +609,14 @@ private struct TagChip: View {
                 Text(name)
                     .font(Theme.Typography.caption().weight(.medium))
             }
-            .foregroundStyle(isSelected ? Theme.Colors.textOnDarkPrimary : Theme.Colors.textOnDarkSecondary)
+            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm)
-            .background(isSelected ? Theme.Colors.accentGreen : Theme.Colors.cardSurface)
+            .background(Theme.Colors.cardSurface)
             .clipShape(Capsule())
             .overlay {
-                if !isSelected {
-                    Capsule()
-                        .stroke(Theme.Colors.cream.opacity(0.15), lineWidth: 1)
-                }
+                Capsule()
+                    .stroke(Theme.Colors.cream.opacity(0.15), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)

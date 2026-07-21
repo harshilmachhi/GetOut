@@ -10,6 +10,11 @@ final class Profile {
     var avatarSystemImage: String = "person.fill"
     var citiesVisited: [String] = []
     var createdAt: Date = Date.now
+    var cloudKitUserRecordName: String = ""
+    var publicFollowerCount: Int = 0
+    var publicFollowingCount: Int = 0
+    var preferredCategories: [String] = []
+    var preferredTags: [String] = []
 
     @Relationship(inverse: \Spot.owner)
     var spots: [Spot]?

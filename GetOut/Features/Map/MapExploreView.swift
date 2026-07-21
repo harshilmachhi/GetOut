@@ -75,7 +75,6 @@ struct MapExploreView: View {
         }
         .mapStyle(.standard(elevation: .flat))
         .mapControls {
-            MapUserLocationButton()
             MapCompass()
         }
         .ignoresSafeArea()
@@ -104,9 +103,33 @@ struct MapExploreView: View {
                 .clipShape(Capsule())
 
             Spacer()
+
+            Button(action: centerOnUserTapped) {
+                Image(systemName: "location.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                    .frame(width: 40, height: 40)
+                    .background(.ultraThinMaterial.opacity(0.85))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, Theme.Spacing.md)
-        .padding(.top, Theme.Spacing.sm)
+        .safeAreaPadding(.top, Theme.Spacing.sm)
+    }
+
+    private func centerOnUserTapped() {
+        switch locationManager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            guard let region = locationManager.centerOnUser() else { return }
+            withAnimation {
+                cameraPosition = .region(region)
+            }
+        case .notDetermined:
+            locationManager.requestPermission()
+        default:
+            break
+        }
     }
 
     private func updateCameraIfNeeded() {

@@ -4,9 +4,9 @@ import SwiftUI
 struct CreateTripView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(SessionStore.self) private var session
 
-    @Query(filter: #Predicate<Profile> { $0.username == "harshil" }) private var demoProfiles: [Profile]
-    @Query private var allProfiles: [Profile]
+    @Query(sort: \Profile.createdAt) private var allProfiles: [Profile]
 
     @State private var title = ""
     @State private var summary = ""
@@ -18,7 +18,7 @@ struct CreateTripView: View {
     var onCreated: ((Trip) -> Void)?
 
     private var demoProfile: Profile? {
-        demoProfiles.first ?? allProfiles.first
+        allProfiles.first { $0.username == session.currentUsername } ?? allProfiles.first
     }
 
     private var canSave: Bool {

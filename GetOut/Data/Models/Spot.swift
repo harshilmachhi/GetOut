@@ -16,7 +16,11 @@ final class Spot {
     var photoSystemImage: String = "photo"
     @Attribute(.externalStorage) var photoData: Data?
     var rating: Double = 0
+    var visitHour: Int = -1
+    var visitWeekday: Int = -1
     var createdAt: Date = Date.now
+    var publicRecordName: String = ""
+    var publisherUserRecordName: String = ""
 
     var owner: Profile?
 

@@ -13,11 +13,14 @@ enum SeedData {
     ]
 
     static func seedIfNeeded(in context: ModelContext) {
+        guard !FeatureFlags.cloudKitDatabaseEnabled else { return }
+
         var descriptor = FetchDescriptor<Spot>()
         descriptor.fetchLimit = 1
         guard (try? context.fetch(descriptor).isEmpty) == true else {
             seedSampleTripIfNeeded(in: context)
             seedProfileEngagementIfNeeded(in: context)
+            seedDemoFriendsIfNeeded(in: context)
             backfillSpotPhotosIfNeeded(in: context)
             return
         }
@@ -27,6 +30,8 @@ enum SeedData {
         profile.displayName = "Harshil"
         profile.bio = "Exploring NYC one hidden spot at a time."
         profile.citiesVisited = ["New York"]
+        profile.preferredCategories = [SpotCategory.views.rawValue, SpotCategory.nature.rawValue]
+        profile.preferredTags = ["sunset", "quiet", "weed-friendly"]
         context.insert(profile)
 
         let tagNames = [
@@ -71,6 +76,106 @@ enum SeedData {
 
         seedSampleTrip(in: context, profile: profile, spots: seededSpots)
         seedProfileEngagementIfNeeded(in: context)
+        seedDemoFriendsIfNeeded(in: context)
+
+        try? context.save()
+    }
+
+    static func seedDemoFriendsIfNeeded(in context: ModelContext) {
+        guard !FeatureFlags.cloudKitDatabaseEnabled else { return }
+
+        var existingDescriptor = FetchDescriptor<Profile>(
+            predicate: #Predicate { $0.username == "maya" }
+        )
+        existingDescriptor.fetchLimit = 1
+        guard (try? context.fetch(existingDescriptor).first) == nil else { return }
+
+        var harshilDescriptor = FetchDescriptor<Profile>(
+            predicate: #Predicate { $0.username == "harshil" }
+        )
+        harshilDescriptor.fetchLimit = 1
+        guard let harshil = try? context.fetch(harshilDescriptor).first else { return }
+
+        let demoProfiles: [(username: String, displayName: String, bio: String, avatar: String, categories: [String], tags: [String])] = [
+            (
+                "maya",
+                "Maya Chen",
+                "Coffee shops with a view are my love language.",
+                "cup.and.saucer.fill",
+                [SpotCategory.coffee.rawValue, SpotCategory.views.rawValue],
+                ["cozy", "sunset", "coffee"]
+            ),
+            (
+                "jordan",
+                "Jordan Lee",
+                "Always hunting late-night dumplings and hidden bars.",
+                "moon.stars.fill",
+                [SpotCategory.food.rawValue, SpotCategory.nightlife.rawValue],
+                ["late-night", "local", "foodie"]
+            ),
+            (
+                "alex",
+                "Alex Rivera",
+                "Park knolls, quiet corners, and golden hour chaser.",
+                "leaf.fill",
+                [SpotCategory.nature.rawValue, SpotCategory.views.rawValue],
+                ["picnic", "sunset", "weed-friendly", "quiet"]
+            ),
+            (
+                "sam",
+                "Sam Patel",
+                "Hidden gems over tourist traps, every time.",
+                "magnifyingglass",
+                [SpotCategory.coffee.rawValue, SpotCategory.food.rawValue],
+                ["hidden", "local", "cozy"]
+            ),
+            (
+                "riley",
+                "Riley Brooks",
+                "Brooklyn views and waterfront walks.",
+                "water.waves",
+                [SpotCategory.views.rawValue, SpotCategory.nature.rawValue],
+                ["waterfront", "view", "sunset"]
+            ),
+        ]
+
+        var profilesByUsername: [String: Profile] = ["harshil": harshil]
+
+        for spec in demoProfiles {
+            let profile = Profile()
+            profile.username = spec.username
+            profile.displayName = spec.displayName
+            profile.bio = spec.bio
+            profile.avatarSystemImage = spec.avatar
+            profile.citiesVisited = ["New York"]
+            profile.preferredCategories = spec.categories
+            profile.preferredTags = spec.tags
+            context.insert(profile)
+            profilesByUsername[spec.username] = profile
+        }
+
+        let followEdges: [(String, String)] = [
+            ("harshil", "alex"),
+            ("harshil", "maya"),
+            ("maya", "alex"),
+            ("maya", "jordan"),
+            ("jordan", "maya"),
+            ("jordan", "sam"),
+            ("alex", "maya"),
+            ("alex", "riley"),
+            ("sam", "jordan"),
+            ("riley", "alex"),
+        ]
+
+        for (followerUsername, followeeUsername) in followEdges {
+            guard let follower = profilesByUsername[followerUsername],
+                  let followee = profilesByUsername[followeeUsername] else { continue }
+
+            let follow = Follow()
+            follow.follower = follower
+            follow.followee = followee
+            context.insert(follow)
+        }
 
         try? context.save()
     }

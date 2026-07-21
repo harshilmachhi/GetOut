@@ -3,27 +3,41 @@ import SwiftData
 
 @main
 struct GetOutApp: App {
+    @UIApplicationDelegateAdaptor(CloudKitShareAcceptanceDelegate.self)
+    private var cloudKitShareAcceptanceDelegate
+
+    @State private var session = SessionStore()
+
     let container: ModelContainer
 
     init() {
         container = Self.makeContainer()
+        SwiftDataCloudKitBridge.register(modelContainer: container)
     }
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
-                .preferredColorScheme(.dark)
-                .tint(Theme.Colors.accentGreen)
-                .task {
-                    SeedData.seedIfNeeded(in: container.mainContext)
+            Group {
+                if !session.isAuthenticated {
+                    LoginView()
+                } else if !session.hasCompletedOnboarding {
+                    OnboardingFlowView()
+                } else {
+                    RootTabView()
                 }
+            }
+            .environment(session)
+            .preferredColorScheme(.dark)
+            .tint(Theme.Colors.accentGreen)
+            .cloudKitRemoteChangeHandlingEnabled()
+            .task {
+                SeedData.seedIfNeeded(in: container.mainContext)
+            }
         }
         .modelContainer(container)
     }
 
     private static func makeContainer() -> ModelContainer {
-        let useCloudKit = false
-
         let schema = Schema([
             Profile.self,
             Spot.self,
@@ -38,13 +52,11 @@ struct GetOutApp: App {
 
         do {
             let configuration: ModelConfiguration
-            if useCloudKit {
-                // CloudKit sync — enable after signing + entitlements are wired:
-                // configuration = ModelConfiguration(
-                //     schema: schema,
-                //     cloudKitDatabase: .private("iCloud.com.getout.app")
-                // )
-                configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            if FeatureFlags.cloudKitDatabaseEnabled {
+                configuration = ModelConfiguration(
+                    schema: schema,
+                    cloudKitDatabase: .private("iCloud.com.getout.app")
+                )
             } else {
                 configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
             }

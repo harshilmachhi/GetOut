@@ -20,6 +20,8 @@ private enum ProfileSegment: String, CaseIterable, Identifiable {
 }
 
 struct ProfileView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(SessionStore.self) private var session
     @Query(sort: \Profile.createdAt) private var profiles: [Profile]
     @Query(sort: \Spot.createdAt) private var allSpots: [Spot]
     @Query(sort: \Like.createdAt, order: .reverse) private var allLikes: [Like]
@@ -28,9 +30,11 @@ struct ProfileView: View {
 
     @State private var selectedSegment: ProfileSegment = .loved
     @State private var selectedSpot: Spot?
+    @State private var socialCoordinator = PublicSocialCoordinator.shared
+    @State private var socialListKind: PublicSocialListKind?
 
     private var profile: Profile? {
-        profiles.first(where: { $0.username == "harshil" }) ?? profiles.first
+        profiles.first(where: { $0.username == session.currentUsername }) ?? profiles.first
     }
 
     private var profileID: UUID? { profile?.id }
@@ -70,11 +74,33 @@ struct ProfileView: View {
     }
 
     private var followerCount: Int {
+        if FeatureFlags.publicSocialEnabled, let profile {
+            if profile.publicFollowerCount > 0 {
+                return profile.publicFollowerCount
+            }
+            if !profile.cloudKitUserRecordName.isEmpty {
+                return PublicSocialCacheStore.publicFollowerCount(
+                    for: profile.cloudKitUserRecordName,
+                    in: modelContext
+                )
+            }
+        }
         guard let profileID else { return 0 }
         return allFollows.filter { $0.followee?.id == profileID }.count
     }
 
     private var followingCount: Int {
+        if FeatureFlags.publicSocialEnabled, let profile {
+            if profile.publicFollowingCount > 0 {
+                return profile.publicFollowingCount
+            }
+            if !profile.cloudKitUserRecordName.isEmpty {
+                return PublicSocialCacheStore.publicFollowingCount(
+                    for: profile.cloudKitUserRecordName,
+                    in: modelContext
+                )
+            }
+        }
         guard let profileID else { return 0 }
         return allFollows.filter { $0.follower?.id == profileID }.count
     }
@@ -93,6 +119,16 @@ struct ProfileView: View {
         .navigationDestination(item: $selectedSpot) { spot in
             SpotDetailView(spot: spot)
         }
+        .navigationDestination(item: $socialListKind) { kind in
+            if let profile {
+                LocalSocialListView(kind: kind, profile: profile)
+            }
+        }
+        .task(id: profile?.id) {
+            guard FeatureFlags.publicSocialEnabled, let profile else { return }
+            await socialCoordinator.bootstrapIdentity(for: profile, in: modelContext)
+            await socialCoordinator.refreshProfileSocial(for: profile, in: modelContext)
+        }
     }
 
     @ViewBuilder
@@ -103,8 +139,14 @@ struct ProfileView: View {
                     profile: profile,
                     spotCount: ownedSpots.count,
                     followerCount: followerCount,
-                    followingCount: followingCount
+                    followingCount: followingCount,
+                    onFollowersTap: { socialListKind = .followers },
+                    onFollowingTap: { socialListKind = .following }
                 )
+
+                if FeatureFlags.publicSocialEnabled, let message = socialCoordinator.profileSocialError {
+                    PublicSocialInlineMessage(message: message)
+                }
 
                 Picker("Profile section", selection: $selectedSegment) {
                     ForEach(ProfileSegment.allCases) { segment in
@@ -153,6 +195,8 @@ private struct ProfileHeaderCard: View {
     let spotCount: Int
     let followerCount: Int
     let followingCount: Int
+    var onFollowersTap: (() -> Void)?
+    var onFollowingTap: (() -> Void)?
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
@@ -184,22 +228,54 @@ private struct ProfileHeaderCard: View {
 
             HStack(spacing: Theme.Spacing.xl) {
                 ProfileStatItem(value: spotCount, label: "Spots")
-                ProfileStatItem(value: followerCount, label: "Followers")
-                ProfileStatItem(value: followingCount, label: "Following")
+                ProfileStatItem(value: followerCount, label: "Followers", action: onFollowersTap)
+                ProfileStatItem(value: followingCount, label: "Following", action: onFollowingTap)
             }
             .padding(.top, Theme.Spacing.sm)
         }
         .frame(maxWidth: .infinity)
         .padding(Theme.Spacing.lg)
         .card()
+        .overlay(alignment: .topTrailing) {
+            NavigationLink {
+                AddFriendsView()
+            } label: {
+                Image(systemName: "person.badge.plus")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.accentGreen)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.Colors.accentGreen.opacity(0.14))
+                    .clipShape(Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Theme.Colors.accentGreen.opacity(0.45), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .padding(Theme.Spacing.sm)
+        }
     }
 }
 
 private struct ProfileStatItem: View {
     let value: Int
     let label: String
+    var action: (() -> Void)?
 
     var body: some View {
+        Group {
+            if let action {
+                Button(action: action) {
+                    statContent
+                }
+                .buttonStyle(.plain)
+            } else {
+                statContent
+            }
+        }
+    }
+
+    private var statContent: some View {
         VStack(spacing: Theme.Spacing.xs) {
             Text("\(value)")
                 .font(Theme.Typography.sectionHeader())
@@ -427,5 +503,12 @@ private struct ProfileMissingState: View {
         ProfileView()
     }
     .modelContainer(container)
+    .environment(SessionStore())
     .preferredColorScheme(.dark)
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

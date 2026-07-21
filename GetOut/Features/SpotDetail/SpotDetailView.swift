@@ -7,14 +7,23 @@ struct SpotDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Profile> { $0.username == "harshil" }) private var demoProfiles: [Profile]
+    @Environment(SessionStore.self) private var session
+    @Query(sort: \Profile.createdAt) private var profiles: [Profile]
 
     @State private var didLogView = false
     @State private var showAddToTrip = false
+    @State private var socialCoordinator = PublicSocialCoordinator.shared
 
     private let heroHeight: CGFloat = 360
 
-    private var demoProfile: Profile? { demoProfiles.first }
+    private var demoProfile: Profile? {
+        profiles.first { $0.username == session.currentUsername } ?? profiles.first
+    }
+
+    private var isOwner: Bool {
+        guard let demoProfile else { return false }
+        return spot.owner?.id == demoProfile.id
+    }
 
     private var isLiked: Bool {
         guard let profileID = demoProfile?.id else { return false }
@@ -50,6 +59,9 @@ struct SpotDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             logViewIfNeeded()
+            if FeatureFlags.publicSocialEnabled, let profile = demoProfile {
+                await socialCoordinator.bootstrapIdentity(for: profile, in: modelContext)
+            }
         }
         .sheet(isPresented: $showAddToTrip) {
             AddToTripSheet(spot: spot)
@@ -139,6 +151,7 @@ struct SpotDetailView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
             ratingRow
             actionRow
+            publishSection
             aboutSection
             tagsSection
             locationSection
@@ -202,6 +215,13 @@ struct SpotDetailView: View {
             ) {
                 showAddToTrip = true
             }
+        }
+    }
+
+    @ViewBuilder
+    private var publishSection: some View {
+        if FeatureFlags.publicSocialEnabled, isOwner, let owner = spot.owner {
+            PublicPublishSpotSection(spot: spot, owner: owner)
         }
     }
 
@@ -296,6 +316,13 @@ struct SpotDetailView: View {
                     }
 
                     Spacer()
+
+                    if FeatureFlags.publicSocialEnabled, !owner.cloudKitUserRecordName.isEmpty {
+                        PublicFollowButton(
+                            targetUserRecordName: owner.cloudKitUserRecordName,
+                            compact: true
+                        )
+                    }
                 }
             }
         }

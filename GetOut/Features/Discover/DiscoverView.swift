@@ -12,25 +12,38 @@ private struct CategoryChip: Identifiable {
 
 struct DiscoverView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(SessionStore.self) private var session
     @Query(sort: \Spot.rating, order: .reverse) private var allSpots: [Spot]
-    @Query(filter: #Predicate<Profile> { $0.username == "harshil" }) private var demoProfiles: [Profile]
+    @Query(sort: \Profile.createdAt) private var profiles: [Profile]
 
     @State private var selectedCategory: SpotCategory = .nearby
     @State private var showMapExplore = false
     @State private var showSearch = false
+    @State private var showSettings = false
     @State private var openSearchFiltersOnAppear = false
     @State private var selectedSpot: Spot?
+    @State private var locationManager = LocationManager()
 
     private var categories: [CategoryChip] {
         SpotCategory.allCases.map { CategoryChip(category: $0) }
     }
 
-    private var filteredSpots: [Spot] {
+    private var candidateSpots: [Spot] {
         guard selectedCategory != .nearby else { return allSpots }
         return allSpots.filter { $0.categoryEnum == selectedCategory }
     }
 
-    private var demoProfile: Profile? { demoProfiles.first }
+    private var rankedSpots: [ScoredSpot] {
+        RecommendationEngine.rank(
+            spots: candidateSpots,
+            for: demoProfile,
+            userLocation: locationManager.lastLocation
+        )
+    }
+
+    private var demoProfile: Profile? {
+        profiles.first { $0.username == session.currentUsername } ?? profiles.first
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -47,6 +60,9 @@ struct DiscoverView: View {
                         onFilterTap: {
                             openSearchFiltersOnAppear = true
                             showSearch = true
+                        },
+                        onOpenSettings: {
+                            showSettings = true
                         }
                     )
 
@@ -57,12 +73,15 @@ struct DiscoverView: View {
                     .padding(.top, Theme.Spacing.lg)
 
                     ForYouNearbySection(
-                        spots: filteredSpots,
+                        scoredSpots: rankedSpots,
                         demoProfile: demoProfile,
                         onToggleLike: toggleLike,
                         onSelectSpot: { selectedSpot = $0 }
                     )
                     .padding(.top, Theme.Spacing.xl)
+
+                    PublicDiscoverFeedSection()
+                        .padding(.top, Theme.Spacing.xl)
 
                     ExploreMapSection(spots: allSpots) {
                         showMapExplore = true
@@ -84,8 +103,14 @@ struct DiscoverView: View {
                     openSearchFiltersOnAppear = false
                 }
         }
+        .navigationDestination(isPresented: $showSettings) {
+            SettingsView()
+        }
         .fullScreenCover(isPresented: $showMapExplore) {
             MapExploreView()
+        }
+        .task {
+            locationManager.requestPermission()
         }
     }
 
@@ -111,6 +136,7 @@ private struct HeroHeader: View {
     let topInset: CGFloat
     let onSearchTap: () -> Void
     let onFilterTap: () -> Void
+    let onOpenSettings: () -> Void
 
     private let heroHeight: CGFloat = 330
     private let heroSubtext = Color.black.opacity(0.7)
@@ -190,14 +216,18 @@ private struct HeroHeader: View {
 
             Spacer()
 
-            Circle()
-                .fill(Color.white.opacity(0.85))
-                .frame(width: 44, height: 44)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.body)
-                        .foregroundStyle(heroSubtext)
-                }
+            Button(action: onOpenSettings) {
+                Circle()
+                    .fill(Color.white.opacity(0.85))
+                    .frame(width: 44, height: 44)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .font(.body)
+                            .foregroundStyle(heroSubtext)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Account settings")
         }
     }
 
@@ -286,7 +316,7 @@ private struct CategoryChipItem: View {
 // MARK: - For You Nearby
 
 private struct ForYouNearbySection: View {
-    let spots: [Spot]
+    let scoredSpots: [ScoredSpot]
     let demoProfile: Profile?
     let onToggleLike: (Spot) -> Void
     let onSelectSpot: (Spot) -> Void
@@ -320,13 +350,14 @@ private struct ForYouNearbySection: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.Spacing.md) {
-                    ForEach(Array(spots.enumerated()), id: \.element.id) { index, spot in
+                    ForEach(Array(scoredSpots.enumerated()), id: \.element.id) { index, scored in
                         SpotCard(
-                            spot: spot,
+                            spot: scored.spot,
                             gradientIndex: index,
-                            isLiked: isLiked(spot),
-                            onToggleLike: { onToggleLike(spot) },
-                            onTap: { onSelectSpot(spot) }
+                            distanceMeters: scored.distanceMeters,
+                            isLiked: isLiked(scored.spot),
+                            onToggleLike: { onToggleLike(scored.spot) },
+                            onTap: { onSelectSpot(scored.spot) }
                         )
                     }
                 }
@@ -347,6 +378,7 @@ private struct ForYouNearbySection: View {
 private struct SpotCard: View {
     let spot: Spot
     let gradientIndex: Int
+    let distanceMeters: Double?
     let isLiked: Bool
     let onToggleLike: () -> Void
     let onTap: () -> Void
@@ -437,10 +469,11 @@ private struct SpotCard: View {
     }
 
     private var locationLine: String {
+        let lead = DistanceFormatter.shortLabel(meters: distanceMeters) ?? "Nearby"
         if spot.neighborhood.isEmpty {
-            return "Nearby"
+            return lead
         }
-        return "Nearby · \(spot.neighborhood)"
+        return "\(lead) · \(spot.neighborhood)"
     }
 }
 

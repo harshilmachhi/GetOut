@@ -20,3 +20,19 @@ targets:
       INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
       INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
       INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "GetOut uses your location to show great spots near you."
+      INFOPLIST_KEY_NSContactsUsageDescription: "GetOut finds friends you already know from your contacts."
+      CODE_SIGN_ENTITLEMENTS: GetOut/GetOut.entitlements
+      INFOPLIST_KEY_UIBackgroundModes: remote-notification
+      # Fill in your Apple Developer Team ID to enable signing and CloudKit on device.
+      DEVELOPMENT_TEAM: ""
+  GetOutTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - GetOutTests
+    dependencies:
+      - target: GetOut
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      PRODUCT_BUNDLE_IDENTIFIER: com.getout.app.tests
+      SWIFT_VERSION: "5.0"

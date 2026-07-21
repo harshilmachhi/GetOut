@@ -74,7 +74,7 @@ struct TripsView: View {
                 }
             }
             .padding(Theme.Spacing.md)
-            .padding(.bottom, Theme.Spacing.xl)
+            .padding(.bottom, 96)
         }
     }
 }

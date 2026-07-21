@@ -1,15 +1,37 @@
 import MapKit
 import SwiftData
 import SwiftUI
+import CloudKit
 
 struct TripDetailView: View {
     let trip: Trip
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(SessionStore.self) private var session
+
+    @Query(sort: \Profile.createdAt) private var profiles: [Profile]
 
     @State private var showSpotPicker = false
     @State private var selectedSpot: Spot?
     @State private var isGeneratingPlan = false
+    @State private var showShareSheet = false
+    @State private var preparedShare: CKShare?
+    @State private var isPreparingShare = false
+    @State private var shareErrorMessage: String?
+    @State private var collaborators: [TripCollaborator] = []
+
+    private var collaborationEnabled: Bool {
+        FeatureFlags.collaborativeTripsEnabled
+    }
+
+    private var currentProfile: Profile? {
+        profiles.first { $0.username == session.currentUsername } ?? profiles.first
+    }
+
+    private var isTripOwner: Bool {
+        guard let ownerID = trip.owner?.id, let currentProfile else { return false }
+        return currentProfile.id == ownerID
+    }
 
     private var stops: [TripStop] {
         (trip.stops ?? []).sorted {
@@ -51,21 +73,53 @@ struct TripDetailView: View {
 
                 actionButtons
 
+                if collaborationEnabled {
+                    collaborationSection
+                }
+
                 if !mappableStops.isEmpty {
                     tripMapSection
                 }
 
+                if !trip.planSummary.isEmpty {
+                    planSummaryCard
+                }
+
                 itinerarySection
             }
-            .padding(.bottom, Theme.Spacing.xl)
+            .padding(.bottom, 96)
         }
         .background(Theme.Colors.appBackground)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: trip.id) {
+            guard collaborationEnabled else { return }
+            collaborators = await TripSharingService.shared.collaborators(for: trip, in: modelContext)
+        }
         .navigationDestination(item: $selectedSpot) { spot in
             SpotDetailView(spot: spot)
         }
         .sheet(isPresented: $showSpotPicker) {
             SpotPickerSheet(trip: trip)
+        }
+        .sheet(isPresented: $showShareSheet, onDismiss: {
+            preparedShare = nil
+            Task {
+                collaborators = await TripSharingService.shared.collaborators(for: trip, in: modelContext)
+            }
+        }) {
+            if let preparedShare {
+                TripSharingController(share: preparedShare) {
+                    showShareSheet = false
+                }
+            }
+        }
+        .alert("Couldn’t share trip", isPresented: Binding(
+            get: { shareErrorMessage != nil },
+            set: { if !$0 { shareErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(shareErrorMessage ?? "")
         }
     }
 
@@ -107,39 +161,137 @@ struct TripDetailView: View {
     }
 
     private var actionButtons: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Button {
-                showSpotPicker = true
-            } label: {
-                Label("Add spots", systemImage: "plus")
-                    .font(Theme.Typography.body().weight(.medium))
-                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Theme.Colors.cardSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
-            }
-            .buttonStyle(.plain)
+        VStack(spacing: Theme.Spacing.sm) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Button {
+                    showSpotPicker = true
+                } label: {
+                    Label("Add spots", systemImage: "plus")
+                        .font(Theme.Typography.body().weight(.medium))
+                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.md)
+                        .background(Theme.Colors.cardSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                }
+                .buttonStyle(.plain)
 
-            Button {
-                generatePlan()
-            } label: {
-                Label(isGeneratingPlan ? "Planning…" : "Generate plan", systemImage: "sparkles")
-                    .font(Theme.Typography.body().weight(.medium))
-                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Spacing.md)
-                    .background(Theme.Colors.accentGreen.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: Theme.Radius.control)
-                            .stroke(Theme.Colors.accentGreen.opacity(0.45), lineWidth: 1)
-                    }
+                Button {
+                    generatePlan()
+                } label: {
+                    Label(isGeneratingPlan ? "Planning…" : "Generate plan", systemImage: "sparkles")
+                        .font(Theme.Typography.body().weight(.medium))
+                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.md)
+                        .background(Theme.Colors.accentGreen.opacity(0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: Theme.Radius.control)
+                                .stroke(Theme.Colors.accentGreen.opacity(0.45), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(stops.isEmpty || isGeneratingPlan)
             }
-            .buttonStyle(.plain)
-            .disabled(stops.isEmpty || isGeneratingPlan)
+
+            if collaborationEnabled && isTripOwner {
+                Button {
+                    Task { await presentShareSheet() }
+                } label: {
+                    Label(isPreparingShare ? "Preparing invite…" : "Share trip", systemImage: "person.badge.plus")
+                        .font(Theme.Typography.body().weight(.medium))
+                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.md)
+                        .background(Theme.Colors.accentGreen.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: Theme.Radius.control)
+                                .stroke(Theme.Colors.accentGreen.opacity(0.35), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(isPreparingShare)
+            }
         }
         .padding(.horizontal, Theme.Spacing.md)
+    }
+
+    private var planSummaryCard: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "sparkles")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Theme.Colors.accentGreen)
+
+                Text("Why this plan")
+                    .font(Theme.Typography.sectionHeader())
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+            }
+
+            Text(trip.planSummary)
+                .font(Theme.Typography.body())
+                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Theme.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Colors.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.card)
+                .stroke(Theme.Colors.accentGreen.opacity(0.25), lineWidth: 1)
+        }
+        .padding(.horizontal, Theme.Spacing.md)
+    }
+
+    @ViewBuilder
+    private var collaborationSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            SectionHeader(title: "Collaborators")
+                .padding(.horizontal, Theme.Spacing.md)
+
+            if collaborators.isEmpty {
+                Text(isTripOwner
+                     ? "Invite friends to view and edit this trip together."
+                     : "No collaborators yet.")
+                    .font(Theme.Typography.body())
+                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                    .padding(.horizontal, Theme.Spacing.md)
+            } else {
+                VStack(spacing: Theme.Spacing.sm) {
+                    ForEach(collaborators) { collaborator in
+                        HStack(spacing: Theme.Spacing.md) {
+                            Image(systemName: collaborator.isOwner ? "crown.fill" : "person.crop.circle")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(
+                                    collaborator.isOwner
+                                        ? Theme.Colors.accentGreen
+                                        : Theme.Colors.textOnDarkSecondary
+                                )
+                                .frame(width: 28)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(collaborator.displayName)
+                                    .font(Theme.Typography.body().weight(.medium))
+                                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+
+                                Text(collaborator.statusLabel)
+                                    .font(Theme.Typography.caption())
+                                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                            }
+
+                            Spacer()
+                        }
+                        .padding(Theme.Spacing.md)
+                        .background(Theme.Colors.cardSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.md)
+            }
+        }
     }
 
     @ViewBuilder
@@ -262,6 +414,22 @@ struct TripDetailView: View {
         stop.dayIndex = dayIndex
         stop.order = (dayStops.map(\.order).max() ?? -1) + 1
         try? modelContext.save()
+    }
+
+    private func presentShareSheet() async {
+        guard collaborationEnabled, isTripOwner else { return }
+
+        isPreparingShare = true
+        shareErrorMessage = nil
+        defer { isPreparingShare = false }
+
+        do {
+            let share = try await TripSharingService.shared.prepareShare(for: trip, in: modelContext)
+            preparedShare = share
+            showShareSheet = true
+        } catch {
+            shareErrorMessage = error.localizedDescription
+        }
     }
 }
 
