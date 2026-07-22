@@ -2,7 +2,7 @@ import Foundation
 
 /// CloudKit public-database record types and field keys for Phase 3 social layer.
 enum PublicCloudKitSchema {
-    static let containerIdentifier = "iCloud.com.getout.app"
+    static let containerIdentifier = "iCloud.com.parth.getout"
 
     enum RecordType {
         static let spot = "PublicSpot"

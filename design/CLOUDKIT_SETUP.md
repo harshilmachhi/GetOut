@@ -6,7 +6,7 @@ CloudKit is designed into the SwiftData stack but **not enabled** in the current
 
 | Flag | Phase | Owner | What it enables |
 |------|-------|-------|-----------------|
-| `FeatureFlags.cloudKitSyncEnabled` | Integrator Phase 1 | cloudkit-integrator | Private iCloud sync via `ModelConfiguration(cloudKitDatabase: .private("iCloud.com.getout.app"))` |
+| `FeatureFlags.cloudKitSyncEnabled` | Integrator Phase 1 | cloudkit-integrator | Private iCloud sync via `ModelConfiguration(cloudKitDatabase: .private("iCloud.com.parth.getout"))` |
 | `FeatureFlags.collaborativeTripsEnabled` | Integrator Phase 2 | cloudkit-integrator | CKShare collaborative trips in the shared CloudKit database |
 | `FeatureFlags.publicSocialEnabled` | Public social | cloudkit-public-social | Public CloudKit database for feed, profiles, and following |
 
@@ -25,8 +25,8 @@ Do **not** flip flags until the checklist below is complete for that phase.
 ### A. One-time Apple Developer Portal + signing
 
 1. Enroll in the Apple Developer Program and note your **Team ID**.
-2. In the portal, enable **iCloud** for App ID `com.getout.app`.
-3. Create CloudKit container **`iCloud.com.getout.app`**.
+2. In the portal, enable **iCloud** for App ID `com.parth.getout`.
+3. Create CloudKit container **`iCloud.com.parth.getout`**.
 4. Enable **Push Notifications** (development) for remote CloudKit change notifications.
 5. In `project.yml`, set `DEVELOPMENT_TEAM` to your Team ID (replace the empty placeholder).
 6. Run `xcodegen generate`.
@@ -34,7 +34,7 @@ Do **not** flip flags until the checklist below is complete for that phase.
 
 Entitlements are already in `GetOut/GetOut.entitlements`:
 
-- `iCloud.com.getout.app` container
+- `iCloud.com.parth.getout` container
 - CloudKit service
 - `aps-environment: development`
 
@@ -51,12 +51,12 @@ Entitlements are already in `GetOut/GetOut.entitlements`:
 4. Set `FeatureFlags.cloudKitSyncEnabled = true` in `GetOut/App/FeatureFlags.swift`.
 5. Build signed for device (`CODE_SIGNING_ALLOWED=YES` with a valid team).
 6. Run on a physical device signed into iCloud.
-7. Open **CloudKit Dashboard** → container `iCloud.com.getout.app` → **Development** environment; confirm schema deploy and records after first launch.
+7. Open **CloudKit Dashboard** → container `iCloud.com.parth.getout` → **Development** environment; confirm schema deploy and records after first launch.
 8. Test multi-device private sync before shipping.
 
 ### C. Phase 2 — collaborative trips (integrator)
 
-Requires Phase 1 private sync on a signed device. Collaborative trips use CloudKit's **shared database** (not the public database). `NSPersistentCloudKitContainer` exposes both private and shared scopes when configured with `.private("iCloud.com.getout.app")` — no separate ModelConfiguration is needed.
+Requires Phase 1 private sync on a signed device. Collaborative trips use CloudKit's **shared database** (not the public database). `NSPersistentCloudKitContainer` exposes both private and shared scopes when configured with `.private("iCloud.com.parth.getout")` — no separate ModelConfiguration is needed.
 
 1. Phase 1 verified on device (`cloudKitSyncEnabled = true`).
 2. Set **`FeatureFlags.cloudKitSyncEnabled = true`** and **`FeatureFlags.collaborativeTripsEnabled = true`** in `GetOut/App/FeatureFlags.swift`.
@@ -64,7 +64,7 @@ Requires Phase 1 private sync on a signed device. Collaborative trips use CloudK
 4. Owner opens a trip → **Share trip** → send invite via the system share sheet (`UICloudSharingController`).
 5. Recipient accepts the invite (Mail/Messages link or app open via `userDidAcceptCloudKitShareWith`).
 6. Confirm both users can view/edit the shared trip and its stops.
-7. In **CloudKit Dashboard** → container `iCloud.com.getout.app` → **Shared** database (Development), confirm the share root record and participants.
+7. In **CloudKit Dashboard** → container `iCloud.com.parth.getout` → **Shared** database (Development), confirm the share root record and participants.
 
 **Implementation notes (code):**
 
@@ -82,7 +82,7 @@ Requires Phase 1 private sync on a signed device. Collaborative trips use CloudK
 
 #### Public database schema (Development)
 
-Deploy these record types in **CloudKit Dashboard** → container `iCloud.com.getout.app` → **Public Database** → **Development** → Schema. Mark listed fields as **Queryable** (and **Sortable** where noted). SwiftData/NSPersistentCloudKitContainer does **not** mirror the public database — the app writes/queries via `CloudKitPublicService` (`CKContainer.publicCloudDatabase`).
+Deploy these record types in **CloudKit Dashboard** → container `iCloud.com.parth.getout` → **Public Database** → **Development** → Schema. Mark listed fields as **Queryable** (and **Sortable** where noted). SwiftData/NSPersistentCloudKitContainer does **not** mirror the public database — the app writes/queries via `CloudKitPublicService` (`CKContainer.publicCloudDatabase`).
 
 | Record type | Record name pattern | Fields | Queryable / sortable indexes |
 |-------------|---------------------|--------|------------------------------|
@@ -92,7 +92,7 @@ Deploy these record types in **CloudKit Dashboard** → container `iCloud.com.ge
 
 **Dashboard steps**
 
-1. Open [CloudKit Dashboard](https://icloud.developer.apple.com/) → `iCloud.com.getout.app` → **Public Database** → **Development**.
+1. Open [CloudKit Dashboard](https://icloud.developer.apple.com/) → `iCloud.com.parth.getout` → **Public Database** → **Development**.
 2. Add record types `PublicSpot`, `PublicUserProfile`, `PublicFollow` with the fields above (matching field names exactly — see `PublicCloudKitSchema.swift`).
 3. For each **Queryable** field in the table, enable **Queryable** in the field editor; enable **Sortable** on `PublicSpot.createdAt` and `PublicFollow.createdAt`.
 4. Deploy schema to Development ( **Deploy to Development** ).
@@ -101,7 +101,7 @@ Deploy these record types in **CloudKit Dashboard** → container `iCloud.com.ge
 
 **Identity**
 
-- Current user: `CKContainer(identifier: "iCloud.com.getout.app").userRecordID()` (wrapped by `PublicSocialIdentityService`).
+- Current user: `CKContainer(identifier: "iCloud.com.parth.getout").userRecordID()` (wrapped by `PublicSocialIdentityService`).
 - Optional Sign in with Apple scaffold: `PublicSocialIdentityService.suggestedHandle(from:)` — full SIWA requires paid account + capability.
 - Local link: `Profile.cloudKitUserRecordName` stores the CloudKit user record name for cache lookups.
 

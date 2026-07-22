@@ -55,7 +55,7 @@ struct GetOutApp: App {
             if FeatureFlags.cloudKitDatabaseEnabled {
                 configuration = ModelConfiguration(
                     schema: schema,
-                    cloudKitDatabase: .private("iCloud.com.getout.app")
+                    cloudKitDatabase: .private("iCloud.com.parth.getout")
                 )
             } else {
                 configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)

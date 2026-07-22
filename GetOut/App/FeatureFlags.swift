@@ -1,6 +1,6 @@
 enum FeatureFlags {
     /// Private iCloud sync via SwiftData + NSPersistentCloudKitContainer (integrator Phase 1).
-    static let cloudKitSyncEnabled = false
+    static let cloudKitSyncEnabled = true
 
     /// Collaborative trips via CKShare in the shared CloudKit database (integrator Phase 2).
     static let collaborativeTripsEnabled = false

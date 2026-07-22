@@ -14,7 +14,7 @@ targets:
       INFOPLIST_KEY_UILaunchScreen_Generation: YES
       CURRENT_PROJECT_VERSION: 1
       MARKETING_VERSION: "0.1"
-      PRODUCT_BUNDLE_IDENTIFIER: com.getout.app
+      PRODUCT_BUNDLE_IDENTIFIER: com.parth.getout
       SWIFT_VERSION: "5.0"
       TARGETED_DEVICE_FAMILY: "1"
       INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
@@ -24,7 +24,7 @@ targets:
       CODE_SIGN_ENTITLEMENTS: GetOut/GetOut.entitlements
       INFOPLIST_KEY_UIBackgroundModes: remote-notification
       # Fill in your Apple Developer Team ID to enable signing and CloudKit on device.
-      DEVELOPMENT_TEAM: ""
+      DEVELOPMENT_TEAM: "3W3G74V42R"
   GetOutTests:
     type: bundle.unit-test
     platform: iOS
@@ -34,5 +34,5 @@ targets:
       - target: GetOut
     settings:
       GENERATE_INFOPLIST_FILE: YES
-      PRODUCT_BUNDLE_IDENTIFIER: com.getout.app.tests
+      PRODUCT_BUNDLE_IDENTIFIER: com.parth.getout.tests
       SWIFT_VERSION: "5.0"

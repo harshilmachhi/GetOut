@@ -6,7 +6,7 @@ import SwiftData
 /// SwiftData on iOS 17 does not expose share APIs directly; this shim locates the backing
 /// container created when `ModelConfiguration(cloudKitDatabase:)` is used.
 enum SwiftDataCloudKitBridge {
-    private static let containerIdentifier = "iCloud.com.getout.app"
+    private static let containerIdentifier = "iCloud.com.parth.getout"
     private static weak var registeredModelContainer: ModelContainer?
 
     static func register(modelContainer: ModelContainer) {
