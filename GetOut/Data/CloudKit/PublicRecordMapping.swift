@@ -29,7 +29,11 @@ enum PublicRecordMapping {
             createdAt: createdAt,
             ownerUserRecordName: ownerUserRecordName,
             ownerDisplayName: record[PublicCloudKitSchema.SpotField.ownerDisplayName] as? String ?? "",
-            ownerUsername: record[PublicCloudKitSchema.SpotField.ownerUsername] as? String ?? ""
+            ownerUsername: record[PublicCloudKitSchema.SpotField.ownerUsername] as? String ?? "",
+            tags: record[PublicCloudKitSchema.SpotField.tags] as? [String] ?? [],
+            containsCannabis: (record[PublicCloudKitSchema.SpotField.containsCannabis] as? NSNumber)?.boolValue ?? false,
+            countryCode: record[PublicCloudKitSchema.SpotField.countryCode] as? String ?? "",
+            administrativeArea: record[PublicCloudKitSchema.SpotField.administrativeArea] as? String ?? ""
         )
     }
 
@@ -50,6 +54,11 @@ enum PublicRecordMapping {
         record[PublicCloudKitSchema.SpotField.ownerUserRecordName] = ownerUserRecordName as CKRecordValue
         record[PublicCloudKitSchema.SpotField.ownerDisplayName] = owner.displayName as CKRecordValue
         record[PublicCloudKitSchema.SpotField.ownerUsername] = owner.username as CKRecordValue
+        let tagNames = Array(Set((spot.tags?.map(\.name) ?? []) + spot.publicTagNames)).sorted()
+        record[PublicCloudKitSchema.SpotField.tags] = tagNames as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.containsCannabis] = NSNumber(value: CannabisPolicy.containsCannabisTag(tagNames))
+        record[PublicCloudKitSchema.SpotField.countryCode] = spot.countryCode as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.administrativeArea] = spot.administrativeArea as CKRecordValue
         return record
     }
 
@@ -67,6 +76,10 @@ enum PublicRecordMapping {
         spot.createdAt = dto.createdAt
         spot.publicRecordName = dto.recordName
         spot.publisherUserRecordName = dto.ownerUserRecordName
+        spot.publicTagNames = dto.tags
+        spot.containsCannabis = dto.containsCannabis
+        spot.countryCode = dto.countryCode
+        spot.administrativeArea = dto.administrativeArea
     }
 
     // MARK: - User profile
@@ -150,5 +163,21 @@ enum PublicRecordMapping {
         follow.followeeUserRecordName = dto.followeeUserRecordName
         follow.createdAt = dto.createdAt
         follow.isPublicSocialFollow = true
+    }
+
+    static func makeReportRecord(
+        from draft: PublicReportDraft,
+        reporterUserRecordName: String
+    ) -> CKRecord {
+        let record = CKRecord(recordType: PublicCloudKitSchema.RecordType.report)
+        record[PublicCloudKitSchema.ReportField.reporterUserRecordName] = reporterUserRecordName as CKRecordValue
+        record[PublicCloudKitSchema.ReportField.targetRecordName] = draft.targetRecordName as CKRecordValue
+        record[PublicCloudKitSchema.ReportField.targetOwnerUserRecordName] = draft.targetOwnerUserRecordName as CKRecordValue
+        record[PublicCloudKitSchema.ReportField.targetKind] = draft.targetKind.rawValue as CKRecordValue
+        record[PublicCloudKitSchema.ReportField.reason] = draft.reason.rawValue as CKRecordValue
+        record[PublicCloudKitSchema.ReportField.details] = draft.details as CKRecordValue
+        record[PublicCloudKitSchema.ReportField.status] = "open" as CKRecordValue
+        record[PublicCloudKitSchema.ReportField.createdAt] = Date.now as CKRecordValue
+        return record
     }
 }

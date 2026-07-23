@@ -120,7 +120,11 @@ struct ProfileView: View {
             SpotDetailView(spot: spot)
         }
         .navigationDestination(item: $socialListKind) { kind in
-            if let profile {
+            if FeatureFlags.publicSocialEnabled,
+               let recordName = profile?.cloudKitUserRecordName,
+               !recordName.isEmpty {
+                PublicSocialListView(kind: kind, userRecordName: recordName)
+            } else if let profile {
                 LocalSocialListView(kind: kind, profile: profile)
             }
         }

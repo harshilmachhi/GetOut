@@ -81,7 +81,17 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
 
     func upsertPublicProfile(_ profile: Profile, userRecordName: String) async throws -> PublicUserProfileDTO {
         guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        let record = PublicRecordMapping.makeUserProfileRecord(from: profile, userRecordName: userRecordName)
+        try await claimUsername(profile.username, for: userRecordName)
+        let newRecord = PublicRecordMapping.makeUserProfileRecord(from: profile, userRecordName: userRecordName)
+        let record: CKRecord
+        if let existing = try? await publicDatabase.record(for: newRecord.recordID) {
+            for key in newRecord.allKeys() {
+                existing[key] = newRecord[key]
+            }
+            record = existing
+        } else {
+            record = newRecord
+        }
         let saved = try await save(record: record)
         guard let dto = PublicRecordMapping.userProfileDTO(from: saved) else {
             throw PublicSocialError.partialFailure("Could not read saved profile.")
@@ -99,6 +109,85 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
             return nil
         } catch {
             throw mapError(error)
+        }
+    }
+
+    func fetchPublicProfile(username: String) async throws -> PublicUserProfileDTO? {
+        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
+        let predicate = NSPredicate(
+            format: "%K == %@",
+            PublicCloudKitSchema.UserProfileField.username,
+            username.lowercased()
+        )
+        let query = CKQuery(recordType: PublicCloudKitSchema.RecordType.userProfile, predicate: predicate)
+        let results = try await publicDatabase.records(matching: query, resultsLimit: 1)
+        for (_, result) in results.matchResults {
+            if case .success(let record) = result {
+                return PublicRecordMapping.userProfileDTO(from: record)
+            }
+        }
+        return nil
+    }
+
+    func deletePublicSpot(recordName: String) async throws {
+        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
+        do {
+            try await publicDatabase.deleteRecord(withID: CKRecord.ID(recordName: recordName))
+        } catch let error as CKError where error.code == .unknownItem {
+            return
+        } catch {
+            throw mapError(error)
+        }
+    }
+
+    func submitReport(_ draft: PublicReportDraft, reporterUserRecordName: String) async throws {
+        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
+        _ = try await save(record: PublicRecordMapping.makeReportRecord(
+            from: draft,
+            reporterUserRecordName: reporterUserRecordName
+        ))
+    }
+
+    func deleteAccountData(userRecordName: String) async throws {
+        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
+
+        // Incoming follow records are owned by the followers under Creator-write permissions.
+        // Leave an authenticated, non-public cleanup request before removing the profile so the
+        // developer can erase those remaining references from CloudKit Dashboard.
+        try await submitReport(
+            PublicReportDraft(
+                targetRecordName: "profile-\(userRecordName)",
+                targetOwnerUserRecordName: userRecordName,
+                targetKind: .profile,
+                reason: .other,
+                details: "ACCOUNT_DELETION: remove incoming PublicFollow references after profile deletion."
+            ),
+            reporterUserRecordName: userRecordName
+        )
+
+        var idsToDelete: [CKRecord.ID] = [CKRecord.ID(recordName: "profile-\(userRecordName)")]
+        idsToDelete += try await recordIDs(
+            recordType: PublicCloudKitSchema.RecordType.spot,
+            field: PublicCloudKitSchema.SpotField.ownerUserRecordName,
+            value: userRecordName
+        )
+        idsToDelete += try await recordIDs(
+            recordType: PublicCloudKitSchema.RecordType.follow,
+            field: PublicCloudKitSchema.FollowField.followerUserRecordName,
+            value: userRecordName
+        )
+        idsToDelete += try await recordIDs(
+            recordType: PublicCloudKitSchema.RecordType.usernameClaim,
+            field: PublicCloudKitSchema.UsernameClaimField.userRecordName,
+            value: userRecordName
+        )
+
+        let uniqueIDs = Array(Dictionary(uniqueKeysWithValues: idsToDelete.map { ($0.recordName, $0) }).values)
+        let result = try await publicDatabase.modifyRecords(saving: [], deleting: uniqueIDs)
+        for (_, deletionResult) in result.deleteResults {
+            if case .failure(let error as CKError) = deletionResult, error.code != .unknownItem {
+                throw mapError(error)
+            }
         }
     }
 
@@ -182,6 +271,35 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
     }
 
     // MARK: - Private
+
+    private func claimUsername(_ username: String, for userRecordName: String) async throws {
+        let normalized = PublicContentPolicy.normalizedUsername(username)
+        let recordID = CKRecord.ID(recordName: PublicCloudKitSchema.usernameClaimRecordName(normalized))
+
+        do {
+            let existing = try await publicDatabase.record(for: recordID)
+            if existing[PublicCloudKitSchema.UsernameClaimField.userRecordName] as? String == userRecordName {
+                return
+            }
+            throw PublicSocialError.partialFailure("That username is already taken.")
+        } catch let error as CKError where error.code == .unknownItem {
+            // No claim exists. The save below uses the record's initial change tag, so only one
+            // concurrent creator can successfully reserve this deterministic record ID.
+        }
+
+        let claim = CKRecord(recordType: PublicCloudKitSchema.RecordType.usernameClaim, recordID: recordID)
+        claim[PublicCloudKitSchema.UsernameClaimField.username] = normalized as CKRecordValue
+        claim[PublicCloudKitSchema.UsernameClaimField.userRecordName] = userRecordName as CKRecordValue
+        claim[PublicCloudKitSchema.UsernameClaimField.createdAt] = Date.now as CKRecordValue
+
+        do {
+            _ = try await publicDatabase.save(claim)
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            throw PublicSocialError.partialFailure("That username is already taken.")
+        } catch {
+            throw mapError(error)
+        }
+    }
 
     private func fetchFeed(
         with cursor: CKQueryOperation.Cursor,
@@ -350,6 +468,29 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
             }
             self.publicDatabase.add(operation)
         }
+    }
+
+    private func recordIDs(recordType: String, field: String, value: String) async throws -> [CKRecord.ID] {
+        let predicate = NSPredicate(format: "%K == %@", field, value)
+        let query = CKQuery(recordType: recordType, predicate: predicate)
+        var ids: [CKRecord.ID] = []
+        var cursor: CKQueryOperation.Cursor?
+
+        repeat {
+            let page: (matchResults: [(CKRecord.ID, Result<CKRecord, Error>)], queryCursor: CKQueryOperation.Cursor?)
+            if let cursor {
+                page = try await publicDatabase.records(continuingMatchFrom: cursor, resultsLimit: 200)
+            } else {
+                page = try await publicDatabase.records(matching: query, desiredKeys: [], resultsLimit: 200)
+            }
+            ids.append(contentsOf: page.matchResults.compactMap { id, result in
+                if case .success = result { return id }
+                return nil
+            })
+            cursor = page.queryCursor
+        } while cursor != nil
+
+        return ids
     }
 
     private func save(record: CKRecord) async throws -> CKRecord {

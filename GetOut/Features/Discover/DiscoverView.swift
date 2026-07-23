@@ -15,6 +15,7 @@ struct DiscoverView: View {
     @Environment(SessionStore.self) private var session
     @Query(sort: \Spot.rating, order: .reverse) private var allSpots: [Spot]
     @Query(sort: \Profile.createdAt) private var profiles: [Profile]
+    @Query private var userBlocks: [UserBlock]
 
     @State private var selectedCategory: SpotCategory = .nearby
     @State private var showMapExplore = false
@@ -23,14 +24,25 @@ struct DiscoverView: View {
     @State private var openSearchFiltersOnAppear = false
     @State private var selectedSpot: Spot?
     @State private var locationManager = LocationManager()
+    @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
 
     private var categories: [CategoryChip] {
         SpotCategory.allCases.map { CategoryChip(category: $0) }
     }
 
     private var candidateSpots: [Spot] {
-        guard selectedCategory != .nearby else { return allSpots }
-        return allSpots.filter { $0.categoryEnum == selectedCategory }
+        let blocked = Set(userBlocks.map(\.blockedUserRecordName))
+        let allowsCannabis = CannabisPolicy.canAccess(
+            ageConfirmed: hasConfirmedCannabisLegalAge,
+            countryCode: locationManager.countryCode,
+            administrativeArea: locationManager.administrativeArea
+        )
+        let visible = allSpots.filter {
+            !blocked.contains($0.publisherUserRecordName)
+                && (allowsCannabis || !$0.containsCannabis)
+        }
+        guard selectedCategory != .nearby else { return visible }
+        return visible.filter { $0.categoryEnum == selectedCategory }
     }
 
     private var rankedSpots: [ScoredSpot] {
@@ -50,7 +62,7 @@ struct DiscoverView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HeroHeader(
-                        displayName: demoProfile?.displayName ?? "Harshil",
+                        displayName: demoProfile?.displayName ?? "Explorer",
                         heroSpot: allSpots.first,
                         topInset: geo.safeAreaInsets.top,
                         onSearchTap: {
@@ -83,7 +95,7 @@ struct DiscoverView: View {
                     PublicDiscoverFeedSection()
                         .padding(.top, Theme.Spacing.xl)
 
-                    ExploreMapSection(spots: allSpots) {
+                    ExploreMapSection(spots: candidateSpots) {
                         showMapExplore = true
                     }
                     .padding(.top, Theme.Spacing.xl)

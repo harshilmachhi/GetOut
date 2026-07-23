@@ -27,6 +27,17 @@ struct SearchFiltersSheet: View {
 
     @State private var draftTags: Set<String>
     @State private var draftSort: SearchSort
+    @State private var locationManager = LocationManager()
+    @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
+
+    private var visibleTags: [Tag] {
+        let canViewCannabis = CannabisPolicy.canAccess(
+            ageConfirmed: hasConfirmedCannabisLegalAge,
+            countryCode: locationManager.countryCode,
+            administrativeArea: locationManager.administrativeArea
+        )
+        return allTags.filter { canViewCannabis || !CannabisPolicy.isCannabisTag($0.name) }
+    }
 
     init(selectedTags: Binding<Set<String>>, sort: Binding<SearchSort>) {
         _selectedTags = selectedTags
@@ -68,6 +79,7 @@ struct SearchFiltersSheet: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .task { locationManager.requestPermission() }
     }
 
     private var tagsSection: some View {
@@ -75,7 +87,7 @@ struct SearchFiltersSheet: View {
             SectionHeader(title: "Tags")
 
             FlowLayout(spacing: Theme.Spacing.sm, lineSpacing: Theme.Spacing.sm) {
-                ForEach(allTags, id: \.id) { tag in
+                ForEach(visibleTags, id: \.id) { tag in
                     FilterTagChip(
                         name: tag.name,
                         isSelected: draftTags.contains(tag.name)

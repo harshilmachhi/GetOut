@@ -4,6 +4,8 @@ import SwiftUI
 struct BasicDetailsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SessionStore.self) private var session
+    @State private var socialCoordinator = PublicSocialCoordinator.shared
+    @State private var isSaving = false
 
     @Binding var displayName: String
     @Binding var username: String
@@ -48,8 +50,19 @@ struct BasicDetailsView: View {
                     }
                 }
 
-                Button(action: saveAndContinue) {
-                    Text("Continue")
+                if let error = socialCoordinator.accountError {
+                    Text(error)
+                        .font(Theme.Typography.caption())
+                        .foregroundStyle(.red.opacity(0.9))
+                }
+
+                Button {
+                    Task { await saveAndContinue() }
+                } label: {
+                    HStack {
+                        if isSaving { ProgressView().tint(Theme.Colors.textOnDarkPrimary) }
+                        Text(isSaving ? "Creating profile…" : "Continue with iCloud")
+                    }
                         .font(Theme.Typography.body().weight(.semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Theme.Spacing.md)
@@ -58,15 +71,11 @@ struct BasicDetailsView: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
                 }
                 .buttonStyle(.plain)
-                .disabled(!canContinue)
+                .disabled(!canContinue || isSaving)
             }
             .padding(Theme.Spacing.lg)
         }
         .background(Theme.Colors.appBackground)
-        .onAppear {
-            if displayName.isEmpty { displayName = session.pendingDisplayName }
-            if username.isEmpty { username = session.pendingUsername }
-        }
     }
 
     private var header: some View {
@@ -107,33 +116,18 @@ struct BasicDetailsView: View {
         }
     }
 
-    private func saveAndContinue() {
-        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedBio = bio.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        var descriptor = FetchDescriptor<Profile>(
-            predicate: #Predicate { $0.username == trimmedUsername }
+    private func saveAndContinue() async {
+        isSaving = true
+        defer { isSaving = false }
+        let profile = await socialCoordinator.createProfile(
+            displayName: displayName,
+            username: username,
+            bio: bio,
+            city: city,
+            in: modelContext
         )
-        descriptor.fetchLimit = 1
-
-        let profile: Profile
-        if let existing = try? modelContext.fetch(descriptor).first {
-            profile = existing
-        } else {
-            profile = Profile()
-            modelContext.insert(profile)
-        }
-
-        profile.username = trimmedUsername
-        profile.displayName = trimmedDisplayName
-        profile.bio = trimmedBio
-        if !trimmedCity.isEmpty {
-            profile.citiesVisited = [trimmedCity]
-        }
-
-        try? modelContext.save()
+        guard profile != nil else { return }
+        username = profile?.username ?? username
         onContinue()
     }
 }

@@ -22,4 +22,4 @@ Open the project in Xcode and run on an iOS 17+ simulator.
 
 - **SwiftUI** — UI framework
 - **SwiftData** — local persistence (coming in a later milestone)
-- **CloudKit** — sync and sharing (coming in a later milestone)
+- **CloudKit** — iCloud identity, private sync, and the public social feed

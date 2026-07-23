@@ -21,6 +21,10 @@ final class Spot {
     var createdAt: Date = Date.now
     var publicRecordName: String = ""
     var publisherUserRecordName: String = ""
+    var publicTagNames: [String] = []
+    var containsCannabis: Bool = false
+    var countryCode: String = ""
+    var administrativeArea: String = ""
 
     var owner: Profile?
 
@@ -49,6 +53,12 @@ final class Spot {
     var mapCoordinate: CLLocationCoordinate2D? {
         guard latitude != 0, longitude != 0 else { return nil }
         return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    @Transient
+    var displayTagNames: [String] {
+        let localNames = tags?.map(\.name) ?? []
+        return Array(Set(localNames + publicTagNames)).sorted()
     }
 
     init() {}

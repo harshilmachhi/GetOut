@@ -1,4 +1,10 @@
+import Foundation
+
 enum FeatureFlags {
+    static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     /// Private iCloud sync via SwiftData + NSPersistentCloudKitContainer (integrator Phase 1).
     static let cloudKitSyncEnabled = true
 
@@ -6,7 +12,7 @@ enum FeatureFlags {
     static let collaborativeTripsEnabled = false
 
     /// Public CloudKit database for social feed, profiles, and following (public-social agent).
-    static let publicSocialEnabled = false
+    static let publicSocialEnabled = true
 
     /// SwiftData CloudKit container (private + shared scopes).
     /// Collaborative trips require private sync — enabling `collaborativeTripsEnabled` implies sync.
@@ -16,6 +22,6 @@ enum FeatureFlags {
     }
 
     static var cloudKitDatabaseEnabled: Bool {
-        effectiveCloudKitSyncEnabled
+        effectiveCloudKitSyncEnabled && !isRunningTests
     }
 }

@@ -20,6 +20,8 @@ struct AddSpotView: View {
     @State private var details = ""
     @State private var neighborhood = ""
     @State private var city = ""
+    @State private var countryCode = ""
+    @State private var administrativeArea = ""
     @State private var selectedTagNames: Set<String> = []
     @State private var newTagName = ""
 
@@ -29,9 +31,34 @@ struct AddSpotView: View {
 
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var photoData: Data?
+    @State private var formError: String?
+    @State private var showCannabisAgeConfirmation = false
+    @State private var showPublicationConfirmation = false
+    @State private var coordinator = PublicSocialCoordinator.shared
+    @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
+
+    private var containsCannabis: Bool {
+        CannabisPolicy.containsCannabisTag(selectedTagNames)
+    }
+
+    private var viewerCanUseCannabis: Bool {
+        CannabisPolicy.canAccess(
+            ageConfirmed: hasConfirmedCannabisLegalAge,
+            countryCode: locationManager.countryCode,
+            administrativeArea: locationManager.administrativeArea
+        )
+    }
 
     private var canSave: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedCoordinate != nil
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && selectedCoordinate != nil
+            && (!containsCannabis || (
+                viewerCanUseCannabis
+                    && CannabisPolicy.isSupportedJurisdiction(
+                        countryCode: countryCode,
+                        administrativeArea: administrativeArea
+                    )
+            ))
     }
 
     private var demoProfile: Profile? {
@@ -39,7 +66,10 @@ struct AddSpotView: View {
     }
 
     private var suggestedTags: [Tag] {
-        allTags.filter { !selectedTagNames.contains($0.name) }
+        allTags.filter {
+            !selectedTagNames.contains($0.name)
+                && (viewerCanUseCannabis || !CannabisPolicy.isCannabisTag($0.name))
+        }
     }
 
     var body: some View {
@@ -73,6 +103,34 @@ struct AddSpotView: View {
         }
         .onChange(of: photoPickerItem) { _, newItem in
             loadPhoto(from: newItem)
+        }
+        .alert("Legal-age confirmation", isPresented: $showCannabisAgeConfirmation) {
+            Button("I am of legal age") {
+                hasConfirmedCannabisLegalAge = true
+                if CannabisPolicy.isSupportedJurisdiction(
+                    countryCode: locationManager.countryCode,
+                    administrativeArea: locationManager.administrativeArea
+                ) {
+                    selectedTagNames.insert(CannabisPolicy.canonicalTag)
+                } else {
+                    formError = "Cannabis tags are available only while you are physically in Canada or California."
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Cannabis-related spots are limited to adults physically in Canada or California and to spots located there. GetOut does not facilitate cannabis sales.")
+        }
+        .confirmationDialog(
+            "Publish this spot?",
+            isPresented: $showPublicationConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Publish spot") {
+                Task { await saveAndPublishSpot() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your public profile and this exact pinned location will be visible to everyone using GetOut.")
         }
     }
 
@@ -207,7 +265,7 @@ struct AddSpotView: View {
                     FlowLayout(spacing: Theme.Spacing.sm, lineSpacing: Theme.Spacing.sm) {
                         ForEach(suggestedTags, id: \.id) { tag in
                             SuggestedTagChip(name: tag.name) {
-                                selectedTagNames.insert(tag.name)
+                                selectTag(tag.name)
                             }
                         }
                     }
@@ -311,18 +369,40 @@ struct AddSpotView: View {
     }
 
     private var saveButton: some View {
-        Button(action: saveSpot) {
-            Text("Save spot")
-                .font(Theme.Typography.body().weight(.semibold))
-                .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.Spacing.md)
-                .background(canSave ? Theme.Colors.accentGreen : Theme.Colors.cardSurface)
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            if containsCannabis && !canSave {
+                Text("Weed-friendly spots require legal-age confirmation, current location in Canada or California, and a spot located there.")
+                    .font(Theme.Typography.caption())
+                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+            }
+
+            if let formError {
+                Text(formError)
+                    .font(Theme.Typography.caption())
+                    .foregroundStyle(.red.opacity(0.9))
+            }
+
+            Button {
+                showPublicationConfirmation = true
+            } label: {
+                HStack {
+                    if coordinator.isPublishingSpot {
+                        ProgressView()
+                            .tint(Theme.Colors.textOnDarkPrimary)
+                    }
+                    Text("Publish spot")
+                }
+                    .font(Theme.Typography.body().weight(.semibold))
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(canSave ? Theme.Colors.accentGreen : Theme.Colors.cardSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSave || coordinator.isPublishingSpot)
+            .opacity(canSave ? 1 : 0.5)
         }
-        .buttonStyle(.plain)
-        .disabled(!canSave)
-        .opacity(canSave ? 1 : 0.5)
     }
 
     private var successOverlay: some View {
@@ -331,7 +411,7 @@ struct AddSpotView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(Theme.Colors.accentGreen)
 
-            Text("Spot saved!")
+            Text("Spot published!")
                 .font(Theme.Typography.sectionHeader())
                 .foregroundStyle(Theme.Colors.textOnDarkPrimary)
         }
@@ -423,6 +503,8 @@ struct AddSpotView: View {
             } else if let adminArea = placemark.administrativeArea, !adminArea.isEmpty {
                 city = adminArea
             }
+            countryCode = placemark.isoCountryCode ?? ""
+            administrativeArea = placemark.administrativeArea ?? ""
         } catch {
             // Geocoding failed — fields remain manually editable.
         }
@@ -431,8 +513,22 @@ struct AddSpotView: View {
     private func addNewTag() {
         let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        selectedTagNames.insert(trimmed)
+        selectTag(trimmed)
         newTagName = ""
+    }
+
+    private func selectTag(_ value: String) {
+        if CannabisPolicy.isCannabisTag(value) {
+            if viewerCanUseCannabis {
+                selectedTagNames.insert(CannabisPolicy.canonicalTag)
+            } else if hasConfirmedCannabisLegalAge {
+                formError = "Cannabis tags are available only while you are physically in Canada or California."
+            } else {
+                showCannabisAgeConfirmation = true
+            }
+        } else {
+            selectedTagNames.insert(value.lowercased())
+        }
     }
 
     private func inferredCategory(from tagNames: Set<String>) -> SpotCategory {
@@ -458,10 +554,21 @@ struct AddSpotView: View {
         return .nearby
     }
 
-    private func saveSpot() {
+    @MainActor
+    private func saveAndPublishSpot() async {
         guard canSave,
               let coordinate = selectedCoordinate,
               let profile = demoProfile else { return }
+
+        if let validationError = PublicContentPolicy.spotError(
+            title: title,
+            details: details,
+            tags: Array(selectedTagNames)
+        ) {
+            formError = validationError
+            return
+        }
+        formError = nil
 
         let now = Date.now
         let calendar = Calendar.current
@@ -480,6 +587,10 @@ struct AddSpotView: View {
         spot.visitWeekday = calendar.component(.weekday, from: now)
         spot.owner = profile
         spot.createdAt = now
+        spot.publicTagNames = Array(selectedTagNames).sorted()
+        spot.containsCannabis = containsCannabis
+        spot.countryCode = countryCode
+        spot.administrativeArea = administrativeArea
 
         var spotTags: [Tag] = []
         for name in selectedTagNames {
@@ -497,7 +608,20 @@ struct AddSpotView: View {
         modelContext.insert(spot)
         profile.spots = (profile.spots ?? []) + [spot]
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            formError = "Could not save this spot. Please try again."
+            return
+        }
+
+        guard await coordinator.publishSpot(spot, owner: profile, in: modelContext) else {
+            profile.spots?.removeAll { $0.id == spot.id }
+            modelContext.delete(spot)
+            try? modelContext.save()
+            formError = coordinator.publishError ?? "Could not publish this spot. Please try again."
+            return
+        }
 
         withAnimation {
             showSuccess = true
@@ -520,6 +644,9 @@ struct AddSpotView: View {
         newTagName = ""
         photoPickerItem = nil
         photoData = nil
+        countryCode = ""
+        administrativeArea = ""
+        formError = nil
     }
 
     private func loadPhoto(from item: PhotosPickerItem?) {

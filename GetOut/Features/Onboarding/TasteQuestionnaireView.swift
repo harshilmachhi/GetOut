@@ -4,7 +4,6 @@ import SwiftUI
 enum OnboardingVibeTag: String, CaseIterable, Identifiable {
     case quiet
     case views
-    case weedFriendly = "weed-friendly"
     case outdoors
     case nightlife
     case foodie
@@ -17,7 +16,6 @@ enum OnboardingVibeTag: String, CaseIterable, Identifiable {
         switch self {
         case .quiet: "Quiet"
         case .views: "Views"
-        case .weedFriendly: "Weed-friendly"
         case .outdoors: "Outdoors"
         case .nightlife: "Nightlife"
         case .foodie: "Foodie"
@@ -28,7 +26,6 @@ enum OnboardingVibeTag: String, CaseIterable, Identifiable {
 
     var symbolName: String? {
         switch self {
-        case .weedFriendly: "leaf.fill"
         default: nil
         }
     }

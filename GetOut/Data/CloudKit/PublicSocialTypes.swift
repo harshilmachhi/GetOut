@@ -45,8 +45,91 @@ struct PublicSpotDTO: Equatable, Sendable, Identifiable {
     let ownerUserRecordName: String
     let ownerDisplayName: String
     let ownerUsername: String
+    let tags: [String]
+    let containsCannabis: Bool
+    let countryCode: String
+    let administrativeArea: String
+
+    init(
+        recordName: String,
+        spotID: UUID,
+        title: String,
+        details: String,
+        latitude: Double,
+        longitude: Double,
+        address: String,
+        city: String,
+        neighborhood: String,
+        category: String,
+        rating: Double,
+        createdAt: Date,
+        ownerUserRecordName: String,
+        ownerDisplayName: String,
+        ownerUsername: String,
+        tags: [String] = [],
+        containsCannabis: Bool = false,
+        countryCode: String = "",
+        administrativeArea: String = ""
+    ) {
+        self.recordName = recordName
+        self.spotID = spotID
+        self.title = title
+        self.details = details
+        self.latitude = latitude
+        self.longitude = longitude
+        self.address = address
+        self.city = city
+        self.neighborhood = neighborhood
+        self.category = category
+        self.rating = rating
+        self.createdAt = createdAt
+        self.ownerUserRecordName = ownerUserRecordName
+        self.ownerDisplayName = ownerDisplayName
+        self.ownerUsername = ownerUsername
+        self.tags = tags
+        self.containsCannabis = containsCannabis
+        self.countryCode = countryCode
+        self.administrativeArea = administrativeArea
+    }
 
     var id: String { recordName }
+}
+
+enum PublicReportTargetKind: String, Sendable {
+    case spot
+    case profile
+}
+
+enum PublicReportReason: String, CaseIterable, Identifiable, Sendable {
+    case harassment
+    case hateOrAbuse
+    case inappropriate
+    case misinformation
+    case spam
+    case unsafeLocation
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .harassment: "Harassment"
+        case .hateOrAbuse: "Hate or abuse"
+        case .inappropriate: "Inappropriate content"
+        case .misinformation: "False information"
+        case .spam: "Spam"
+        case .unsafeLocation: "Unsafe or private location"
+        case .other: "Other"
+        }
+    }
+}
+
+struct PublicReportDraft: Sendable {
+    let targetRecordName: String
+    let targetOwnerUserRecordName: String
+    let targetKind: PublicReportTargetKind
+    let reason: PublicReportReason
+    let details: String
 }
 
 struct PublicUserProfileDTO: Equatable, Sendable, Identifiable {

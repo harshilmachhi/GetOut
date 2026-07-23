@@ -14,6 +14,8 @@ struct PublicSocialListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var profiles: [Profile]
     @Query private var follows: [Follow]
+    @State private var coordinator = PublicSocialCoordinator.shared
+    @State private var actionMessage: String?
 
     let kind: PublicSocialListKind
     let userRecordName: String
@@ -76,6 +78,26 @@ struct PublicSocialListView: View {
                                 targetUserRecordName: profile.cloudKitUserRecordName,
                                 compact: true
                             )
+
+                            Menu {
+                                Menu("Report profile") {
+                                    ForEach(PublicReportReason.allCases) { reason in
+                                        Button(reason.title) {
+                                            report(profile, reason: reason)
+                                        }
+                                    }
+                                }
+                                Button("Block @\(profile.username)", role: .destructive) {
+                                    coordinator.block(
+                                        userRecordName: profile.cloudKitUserRecordName,
+                                        in: modelContext
+                                    )
+                                    actionMessage = "@\(profile.username) is blocked."
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                            }
                         }
                     }
                     .listRowBackground(Theme.Colors.cardSurface)
@@ -86,5 +108,28 @@ struct PublicSocialListView: View {
         .background(Theme.Colors.appBackground)
         .navigationTitle(kind.title)
         .navigationBarTitleDisplayMode(.inline)
+        .alert("GetOut", isPresented: Binding(
+            get: { actionMessage != nil },
+            set: { if !$0 { actionMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { actionMessage = nil }
+        } message: {
+            Text(actionMessage ?? "")
+        }
+    }
+
+    private func report(_ profile: Profile, reason: PublicReportReason) {
+        Task {
+            let sent = await coordinator.report(PublicReportDraft(
+                targetRecordName: "profile-\(profile.cloudKitUserRecordName)",
+                targetOwnerUserRecordName: profile.cloudKitUserRecordName,
+                targetKind: .profile,
+                reason: reason,
+                details: ""
+            ))
+            actionMessage = sent
+                ? "Report sent. Thank you."
+                : (coordinator.accountError ?? "The report could not be sent.")
+        }
     }
 }

@@ -19,6 +19,16 @@ final class DisabledCloudKitPublicService: CloudKitPublicService {
         nil
     }
 
+    func fetchPublicProfile(username: String) async throws -> PublicUserProfileDTO? { nil }
+
+    func deletePublicSpot(recordName: String) async throws { throw PublicSocialError.disabled }
+
+    func deleteAccountData(userRecordName: String) async throws { throw PublicSocialError.disabled }
+
+    func submitReport(_ draft: PublicReportDraft, reporterUserRecordName: String) async throws {
+        throw PublicSocialError.disabled
+    }
+
     func follow(userRecordName: String, currentUserRecordName: String) async throws {
         throw PublicSocialError.disabled
     }

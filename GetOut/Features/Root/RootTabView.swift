@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 private enum AppTab: CaseIterable, Hashable {
     case discover
@@ -26,7 +27,10 @@ private enum AppTab: CaseIterable, Hashable {
 }
 
 struct RootTabView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(SessionStore.self) private var session
     @State private var selectedTab: AppTab = .discover
+    @State private var socialCoordinator = PublicSocialCoordinator.shared
     @Namespace private var tabIndicator
 
     var body: some View {
@@ -40,6 +44,9 @@ struct RootTabView: View {
             )
         }
         .background(Theme.Colors.appBackground)
+        .task {
+            await socialCoordinator.restoreCurrentProfile(in: modelContext, session: session)
+        }
     }
 
     @ViewBuilder
@@ -51,16 +58,25 @@ struct RootTabView: View {
             }
         case .trips:
             NavigationStack {
-                TripsView()
+                accountProtected { TripsView() }
             }
         case .add:
             NavigationStack {
-                AddSpotView()
+                accountProtected { AddSpotView() }
             }
         case .profile:
             NavigationStack {
-                ProfileView()
+                accountProtected { ProfileView() }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func accountProtected<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        if session.hasCompletedOnboarding {
+            content()
+        } else {
+            OnboardingFlowView()
         }
     }
 }

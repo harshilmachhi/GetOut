@@ -13,6 +13,7 @@ struct SpotDetailView: View {
     @State private var didLogView = false
     @State private var showAddToTrip = false
     @State private var socialCoordinator = PublicSocialCoordinator.shared
+    @State private var safetyMessage: String?
 
     private let heroHeight: CGFloat = 360
 
@@ -65,6 +66,14 @@ struct SpotDetailView: View {
         }
         .sheet(isPresented: $showAddToTrip) {
             AddToTripSheet(spot: spot)
+        }
+        .alert("GetOut", isPresented: Binding(
+            get: { safetyMessage != nil },
+            set: { if !$0 { safetyMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { safetyMessage = nil }
+        } message: {
+            Text(safetyMessage ?? "")
         }
     }
 
@@ -229,7 +238,7 @@ struct SpotDetailView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             SectionHeader(title: "About")
 
-            Text(spot.details.isEmpty ? "A quiet corner worth discovering — details coming soon." : spot.details)
+            Text(spot.details.isEmpty ? "No description was provided for this spot." : spot.details)
                 .font(Theme.Typography.body())
                 .foregroundStyle(Theme.Colors.textOnDarkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -238,13 +247,13 @@ struct SpotDetailView: View {
 
     @ViewBuilder
     private var tagsSection: some View {
-        if let tags = spot.tags, !tags.isEmpty {
+        if !spot.displayTagNames.isEmpty {
             VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                 SectionHeader(title: "Tags")
 
                 FlowLayout(spacing: Theme.Spacing.sm, lineSpacing: Theme.Spacing.sm) {
-                    ForEach(tags, id: \.id) { tag in
-                        TagChip(name: tag.name)
+                    ForEach(spot.displayTagNames, id: \.self) { name in
+                        TagChip(name: name)
                     }
                 }
             }
@@ -323,6 +332,30 @@ struct SpotDetailView: View {
                             compact: true
                         )
                     }
+
+                    if FeatureFlags.publicSocialEnabled,
+                       !isOwner,
+                       !spot.publisherUserRecordName.isEmpty {
+                        Menu {
+                            Menu("Report spot") {
+                                ForEach(PublicReportReason.allCases) { reason in
+                                    Button(reason.title) { reportSpot(reason: reason) }
+                                }
+                            }
+
+                            Button("Block @\(owner.username)", role: .destructive) {
+                                socialCoordinator.block(
+                                    userRecordName: spot.publisherUserRecordName,
+                                    in: modelContext
+                                )
+                                safetyMessage = "@\(owner.username) is blocked. Their public spots are hidden."
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.title3)
+                                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                        }
+                    }
                 }
             }
         }
@@ -374,6 +407,21 @@ struct SpotDetailView: View {
         let mapItem = MKMapItem(placemark: placemark)
         mapItem.name = spot.title
         mapItem.openInMaps()
+    }
+
+    private func reportSpot(reason: PublicReportReason) {
+        Task {
+            let submitted = await socialCoordinator.report(PublicReportDraft(
+                targetRecordName: spot.publicRecordName,
+                targetOwnerUserRecordName: spot.publisherUserRecordName,
+                targetKind: .spot,
+                reason: reason,
+                details: ""
+            ))
+            safetyMessage = submitted
+                ? "Report sent. Thank you for helping keep GetOut useful."
+                : (socialCoordinator.accountError ?? "The report could not be sent.")
+        }
     }
 }
 

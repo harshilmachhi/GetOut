@@ -31,7 +31,11 @@ final class MockCloudKitPublicService: CloudKitPublicService, @unchecked Sendabl
             createdAt: spot.createdAt,
             ownerUserRecordName: ownerUserRecordName,
             ownerDisplayName: owner.displayName,
-            ownerUsername: owner.username
+            ownerUsername: owner.username,
+            tags: Array(Set((spot.tags?.map(\.name) ?? []) + spot.publicTagNames)).sorted(),
+            containsCannabis: spot.containsCannabis,
+            countryCode: spot.countryCode,
+            administrativeArea: spot.administrativeArea
         )
         spots.insert(dto, at: 0)
         return dto
@@ -59,6 +63,12 @@ final class MockCloudKitPublicService: CloudKitPublicService, @unchecked Sendabl
 
     func upsertPublicProfile(_ profile: Profile, userRecordName: String) async throws -> PublicUserProfileDTO {
         guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
+        if profiles.values.contains(where: {
+            $0.userRecordName != userRecordName
+                && $0.username.caseInsensitiveCompare(profile.username) == .orderedSame
+        }) {
+            throw PublicSocialError.partialFailure("That username is already taken.")
+        }
         let dto = PublicUserProfileDTO(
             recordName: "profile-\(userRecordName)",
             userRecordName: userRecordName,
@@ -75,6 +85,24 @@ final class MockCloudKitPublicService: CloudKitPublicService, @unchecked Sendabl
     func fetchPublicProfile(userRecordName: String) async throws -> PublicUserProfileDTO? {
         guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
         return profiles[userRecordName]
+    }
+
+    func fetchPublicProfile(username: String) async throws -> PublicUserProfileDTO? {
+        profiles.values.first { $0.username.caseInsensitiveCompare(username) == .orderedSame }
+    }
+
+    func deletePublicSpot(recordName: String) async throws {
+        spots.removeAll { $0.recordName == recordName }
+    }
+
+    func deleteAccountData(userRecordName: String) async throws {
+        profiles.removeValue(forKey: userRecordName)
+        spots.removeAll { $0.ownerUserRecordName == userRecordName }
+        follows = follows.filter { !$0.contains(userRecordName) }
+    }
+
+    func submitReport(_ draft: PublicReportDraft, reporterUserRecordName: String) async throws {
+        if shouldFail { throw PublicSocialError.offline }
     }
 
     func follow(userRecordName: String, currentUserRecordName: String) async throws {

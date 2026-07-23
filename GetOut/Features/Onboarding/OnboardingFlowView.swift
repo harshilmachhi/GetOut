@@ -23,6 +23,18 @@ struct OnboardingFlowView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: step)
+        .safeAreaInset(edge: .top) {
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "icloud.fill")
+                Text("A signed-in iCloud account is required to create a public profile.")
+            }
+            .font(Theme.Typography.caption())
+            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm)
+            .frame(maxWidth: .infinity)
+            .background(Theme.Colors.cardSurface)
+        }
     }
 }
 

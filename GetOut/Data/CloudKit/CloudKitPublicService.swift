@@ -10,6 +10,10 @@ protocol CloudKitPublicService {
 
     func upsertPublicProfile(_ profile: Profile, userRecordName: String) async throws -> PublicUserProfileDTO
     func fetchPublicProfile(userRecordName: String) async throws -> PublicUserProfileDTO?
+    func fetchPublicProfile(username: String) async throws -> PublicUserProfileDTO?
+    func deletePublicSpot(recordName: String) async throws
+    func deleteAccountData(userRecordName: String) async throws
+    func submitReport(_ draft: PublicReportDraft, reporterUserRecordName: String) async throws
 
     func follow(userRecordName: String, currentUserRecordName: String) async throws
     func unfollow(userRecordName: String, currentUserRecordName: String) async throws
@@ -33,7 +37,7 @@ protocol CloudKitPublicService {
 enum CloudKitPublicServiceFactory {
     @MainActor
     static func makeLive() -> CloudKitPublicService {
-        guard FeatureFlags.publicSocialEnabled else {
+        guard FeatureFlags.publicSocialEnabled, !FeatureFlags.isRunningTests else {
             return DisabledCloudKitPublicService()
         }
         return CloudKitPublicServiceLive()

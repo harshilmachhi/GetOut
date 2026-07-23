@@ -92,9 +92,27 @@ struct PublicPublishSpotSection: View {
 
     let spot: Spot
     let owner: Profile
+    @State private var showPublishConfirmation = false
+    @State private var showUnpublishConfirmation = false
+    @State private var locationManager = LocationManager()
+    @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
 
     private var isPublished: Bool {
         !spot.publicRecordName.isEmpty
+    }
+
+    private var canPublishCannabis: Bool {
+        !spot.containsCannabis || (
+            CannabisPolicy.canAccess(
+                ageConfirmed: hasConfirmedCannabisLegalAge,
+                countryCode: locationManager.countryCode,
+                administrativeArea: locationManager.administrativeArea
+            )
+            && CannabisPolicy.isSupportedJurisdiction(
+                countryCode: spot.countryCode,
+                administrativeArea: spot.administrativeArea
+            )
+        )
     }
 
     var body: some View {
@@ -115,11 +133,14 @@ struct PublicPublishSpotSection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Theme.Colors.cardSurface)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+
+                    Button("Remove from public feed", role: .destructive) {
+                        showUnpublishConfirmation = true
+                    }
+                    .font(Theme.Typography.caption().weight(.semibold))
                 } else {
                     Button {
-                        Task {
-                            await coordinator.publishSpot(spot, owner: owner, in: modelContext)
-                        }
+                        showPublishConfirmation = true
                     } label: {
                         HStack {
                             if coordinator.isPublishingSpot {
@@ -143,7 +164,13 @@ struct PublicPublishSpotSection: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .disabled(coordinator.isPublishingSpot)
+                    .disabled(coordinator.isPublishingSpot || !canPublishCannabis)
+
+                    if !canPublishCannabis {
+                        Text("Cannabis-tagged spots require legal-age confirmation and current location in Canada or California.")
+                            .font(Theme.Typography.caption())
+                            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                    }
                 }
 
                 if let publishError = coordinator.publishError {
@@ -151,6 +178,25 @@ struct PublicPublishSpotSection: View {
                         .font(Theme.Typography.caption())
                         .foregroundStyle(.red.opacity(0.85))
                 }
+            }
+            .task { locationManager.requestPermission() }
+            .alert("Share this exact location publicly?", isPresented: $showPublishConfirmation) {
+                Button("Share publicly") {
+                    Task {
+                        await coordinator.publishSpot(spot, owner: owner, in: modelContext)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your public profile, this spot's name, description, tags, and precise map location will be visible to everyone using GetOut.")
+            }
+            .alert("Remove from public feed?", isPresented: $showUnpublishConfirmation) {
+                Button("Remove", role: .destructive) {
+                    Task { await coordinator.unpublishSpot(spot, in: modelContext) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("The spot will remain in your private collection.")
             }
         }
     }

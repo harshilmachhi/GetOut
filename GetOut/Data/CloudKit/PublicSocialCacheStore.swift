@@ -50,7 +50,20 @@ enum PublicSocialCacheStore {
 
     static func syncFeedPage(_ page: PublicFeedPage, in context: ModelContext) {
         for dto in page.spots {
-            _ = upsertSpot(dto, in: context)
+            let spot = upsertSpot(dto, in: context)
+            let owner = upsertProfile(
+                PublicUserProfileDTO(
+                    recordName: "profile-\(dto.ownerUserRecordName)",
+                    userRecordName: dto.ownerUserRecordName,
+                    username: dto.ownerUsername,
+                    displayName: dto.ownerDisplayName,
+                    bio: "",
+                    avatarSystemImage: "person.fill",
+                    createdAt: dto.createdAt
+                ),
+                in: context
+            )
+            spot.owner = owner
         }
         try? context.save()
     }
@@ -79,12 +92,30 @@ enum PublicSocialCacheStore {
         return (try? context.fetchCount(descriptor)) ?? 0
     }
 
-    static func cachedPublicFeedSpots(in context: ModelContext) -> [Spot] {
+    static func cachedPublicFeedSpots(
+        in context: ModelContext,
+        allowCannabis: Bool = false
+    ) -> [Spot] {
         var descriptor = FetchDescriptor<Spot>(
             predicate: #Predicate { !$0.publicRecordName.isEmpty },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
-        return (try? context.fetch(descriptor)) ?? []
+        let blockedNames = Set(((try? context.fetch(FetchDescriptor<UserBlock>())) ?? []).map(\.blockedUserRecordName))
+        return ((try? context.fetch(descriptor)) ?? []).filter { spot in
+            !blockedNames.contains(spot.publisherUserRecordName)
+                && (allowCannabis || !spot.containsCannabis)
+        }
+    }
+
+    static func block(userRecordName: String, in context: ModelContext) {
+        guard !userRecordName.isEmpty else { return }
+        let existing = ((try? context.fetch(FetchDescriptor<UserBlock>())) ?? [])
+            .contains { $0.blockedUserRecordName == userRecordName }
+        guard !existing else { return }
+        let block = UserBlock()
+        block.blockedUserRecordName = userRecordName
+        context.insert(block)
+        try? context.save()
     }
 
     private static func fetchSpot(publicRecordName: String, in context: ModelContext) -> Spot? {

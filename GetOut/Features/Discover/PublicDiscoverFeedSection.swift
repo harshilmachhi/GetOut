@@ -5,11 +5,22 @@ struct PublicDiscoverFeedSection: View {
     @Environment(\.modelContext) private var modelContext
     @State private var coordinator = PublicSocialCoordinator.shared
     @State private var selectedSpot: Spot?
+    @State private var locationManager = LocationManager()
+    @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
+
+    private var canViewCannabisContent: Bool {
+        CannabisPolicy.canAccess(
+            ageConfirmed: hasConfirmedCannabisLegalAge,
+            countryCode: locationManager.countryCode,
+            administrativeArea: locationManager.administrativeArea
+        )
+    }
 
     var body: some View {
         if FeatureFlags.publicSocialEnabled {
             sectionContent
                 .task {
+                    locationManager.requestPermission()
                     await coordinator.refreshFeed(in: modelContext)
                 }
                 .navigationDestination(item: $selectedSpot) { spot in
@@ -37,7 +48,10 @@ struct PublicDiscoverFeedSection: View {
                     .padding(.horizontal, Theme.Spacing.md)
             }
 
-            let spots = coordinator.cachedFeedSpots(in: modelContext)
+            let spots = coordinator.cachedFeedSpots(
+                in: modelContext,
+                allowCannabis: canViewCannabisContent
+            )
             if spots.isEmpty && !coordinator.isLoadingFeed {
                 PublicSocialInlineMessage(message: "No public spots yet. Publish a spot when you're signed into iCloud.")
                     .padding(.horizontal, Theme.Spacing.md)

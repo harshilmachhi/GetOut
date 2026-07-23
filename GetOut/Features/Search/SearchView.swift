@@ -5,6 +5,7 @@ struct SearchView: View {
     var openFiltersOnAppear: Bool = false
 
     @Query private var allSpots: [Spot]
+    @Query private var userBlocks: [UserBlock]
 
     @State private var searchText = ""
     @State private var selectedCategory: SpotCategory = .nearby
@@ -12,6 +13,8 @@ struct SearchView: View {
     @State private var sort: SearchSort = .topRated
     @State private var showFiltersSheet = false
     @State private var selectedSpot: Spot?
+    @State private var locationManager = LocationManager()
+    @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
 
     @FocusState private var isSearchFocused: Bool
     @Environment(\.dismiss) private var dismiss
@@ -36,7 +39,16 @@ struct SearchView: View {
     }
 
     private var filteredSpots: [Spot] {
-        var results = allSpots
+        let blocked = Set(userBlocks.map(\.blockedUserRecordName))
+        let allowsCannabis = CannabisPolicy.canAccess(
+            ageConfirmed: hasConfirmedCannabisLegalAge,
+            countryCode: locationManager.countryCode,
+            administrativeArea: locationManager.administrativeArea
+        )
+        var results = allSpots.filter {
+            !blocked.contains($0.publisherUserRecordName)
+                && (allowsCannabis || !$0.containsCannabis)
+        }
 
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !query.isEmpty {
@@ -44,7 +56,7 @@ struct SearchView: View {
                 spot.title.localizedCaseInsensitiveContains(query)
                     || spot.neighborhood.localizedCaseInsensitiveContains(query)
                     || spot.city.localizedCaseInsensitiveContains(query)
-                    || (spot.tags?.contains { $0.name.localizedCaseInsensitiveContains(query) } ?? false)
+                    || spot.displayTagNames.contains { $0.localizedCaseInsensitiveContains(query) }
             }
         }
 
@@ -54,7 +66,7 @@ struct SearchView: View {
 
         if !selectedTags.isEmpty {
             results = results.filter { spot in
-                let spotTagNames = Set(spot.tags?.map(\.name) ?? [])
+                let spotTagNames = Set(spot.displayTagNames)
                 return selectedTags.isSubset(of: spotTagNames)
             }
         }
@@ -92,6 +104,7 @@ struct SearchView: View {
             SearchFiltersSheet(selectedTags: $selectedTags, sort: $sort)
         }
         .onAppear {
+            locationManager.requestPermission()
             isSearchFocused = true
             if openFiltersOnAppear {
                 showFiltersSheet = true

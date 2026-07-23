@@ -3,6 +3,12 @@ import SwiftData
 import UIKit
 
 enum SeedData {
+    private static let releaseTagNames = [
+        "sunset", "view", "quiet", "cozy", "hidden",
+        "waterfront", "local", "late-night", "picnic",
+        CannabisPolicy.canonicalTag,
+    ]
+
     private static let spotPhotoAssetNames: [String: String] = [
         "Sunset hill seating": "spot_sunset_hill",
         "Hidden cafe in the garden": "spot_hidden_cafe",
@@ -11,6 +17,20 @@ enum SeedData {
         "Late-night dumpling counter": "spot_dumpling",
         "Prospect Park knoll": "spot_prospect_park",
     ]
+
+    static func seedTaxonomyIfNeeded(in context: ModelContext) {
+        let existingNames = Set(((try? context.fetch(FetchDescriptor<Tag>())) ?? []).map(\.name))
+        var inserted = false
+        for name in releaseTagNames where !existingNames.contains(name) {
+            let tag = Tag()
+            tag.name = name
+            context.insert(tag)
+            inserted = true
+        }
+        if inserted {
+            try? context.save()
+        }
+    }
 
     static func seedIfNeeded(in context: ModelContext) {
         guard !FeatureFlags.cloudKitDatabaseEnabled else { return }
@@ -31,28 +51,21 @@ enum SeedData {
         profile.bio = "Exploring NYC one hidden spot at a time."
         profile.citiesVisited = ["New York"]
         profile.preferredCategories = [SpotCategory.views.rawValue, SpotCategory.nature.rawValue]
-        profile.preferredTags = ["sunset", "quiet", "weed-friendly"]
+        profile.preferredTags = ["sunset", "quiet"]
         context.insert(profile)
 
-        let tagNames = [
-            "sunset", "view", "quiet", "cozy", "hidden", "weed-friendly",
-            "waterfront", "local", "late-night", "picnic",
-        ]
         var tagsByName: [String: Tag] = [:]
-        for name in tagNames {
-            let tag = Tag()
-            tag.name = name
-            context.insert(tag)
-            tagsByName[name] = tag
+        for tag in (try? context.fetch(FetchDescriptor<Tag>())) ?? [] {
+            tagsByName[tag.name] = tag
         }
 
         let spotSpecs: [(title: String, neighborhood: String, category: SpotCategory, rating: Double, lat: Double, lon: Double, photo: String, tagNames: [String])] = [
             ("Sunset hill seating", "Fort Greene", .views, 4.9, 40.6892, -73.9747, "sun.horizon.fill", ["sunset", "view", "quiet"]),
-            ("Hidden cafe in the garden", "Clinton Hill", .coffee, 4.8, 40.6897, -73.9618, "cup.and.saucer.fill", ["cozy", "hidden", "weed-friendly"]),
+            ("Hidden cafe in the garden", "Clinton Hill", .coffee, 4.8, 40.6897, -73.9618, "cup.and.saucer.fill", ["cozy", "hidden"]),
             ("East River quiet spot", "Williamsburg", .nature, 4.7, 40.7081, -73.9574, "water.waves", ["waterfront", "quiet", "view"]),
             ("Rooftop reading nook", "Dumbo", .views, 4.6, 40.7033, -73.9897, "building.2.fill", ["view", "quiet", "hidden"]),
             ("Late-night dumpling counter", "Chinatown", .food, 4.5, 40.7158, -73.9970, "fork.knife", ["local", "late-night"]),
-            ("Prospect Park knoll", "Park Slope", .nature, 4.8, 40.6710, -73.9814, "tree.fill", ["picnic", "sunset", "weed-friendly"]),
+            ("Prospect Park knoll", "Park Slope", .nature, 4.8, 40.6710, -73.9814, "tree.fill", ["picnic", "sunset"]),
         ]
 
         var seededSpots: [Spot] = []
@@ -119,7 +132,7 @@ enum SeedData {
                 "Park knolls, quiet corners, and golden hour chaser.",
                 "leaf.fill",
                 [SpotCategory.nature.rawValue, SpotCategory.views.rawValue],
-                ["picnic", "sunset", "weed-friendly", "quiet"]
+                ["picnic", "sunset", "quiet"]
             ),
             (
                 "sam",

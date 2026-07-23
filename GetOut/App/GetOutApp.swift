@@ -18,20 +18,17 @@ struct GetOutApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if !session.isAuthenticated {
-                    LoginView()
-                } else if !session.hasCompletedOnboarding {
-                    OnboardingFlowView()
-                } else {
-                    RootTabView()
-                }
+                RootTabView()
             }
             .environment(session)
             .preferredColorScheme(.dark)
             .tint(Theme.Colors.accentGreen)
             .cloudKitRemoteChangeHandlingEnabled()
             .task {
+                SeedData.seedTaxonomyIfNeeded(in: container.mainContext)
+#if DEBUG
                 SeedData.seedIfNeeded(in: container.mainContext)
+#endif
             }
         }
         .modelContainer(container)
@@ -48,6 +45,7 @@ struct GetOutApp: App {
             Trip.self,
             TripStop.self,
             Interaction.self,
+            UserBlock.self,
         ])
 
         do {

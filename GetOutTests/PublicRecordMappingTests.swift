@@ -13,6 +13,10 @@ final class PublicRecordMappingTests: XCTestCase {
         record[PublicCloudKitSchema.SpotField.ownerUserRecordName] = "user-1" as CKRecordValue
         record[PublicCloudKitSchema.SpotField.city] = "New York" as CKRecordValue
         record[PublicCloudKitSchema.SpotField.category] = SpotCategory.views.rawValue as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.tags] = ["scenic", "weed-friendly"] as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.containsCannabis] = NSNumber(value: true)
+        record[PublicCloudKitSchema.SpotField.countryCode] = "CA" as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.administrativeArea] = "ON" as CKRecordValue
 
         let dto = PublicRecordMapping.spotDTO(from: record)
 
@@ -21,6 +25,10 @@ final class PublicRecordMappingTests: XCTestCase {
         XCTAssertEqual(dto?.title, "Sunset point")
         XCTAssertEqual(dto?.ownerUserRecordName, "user-1")
         XCTAssertEqual(dto?.city, "New York")
+        XCTAssertEqual(dto?.tags, ["scenic", "weed-friendly"])
+        XCTAssertEqual(dto?.containsCannabis, true)
+        XCTAssertEqual(dto?.countryCode, "CA")
+        XCTAssertEqual(dto?.administrativeArea, "ON")
     }
 
     func testApplySpotDTOToModel() {
@@ -39,7 +47,11 @@ final class PublicRecordMappingTests: XCTestCase {
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
             ownerUserRecordName: "user-42",
             ownerDisplayName: "Alex",
-            ownerUsername: "alex"
+            ownerUsername: "alex",
+            tags: ["hidden-gem"],
+            containsCannabis: false,
+            countryCode: "US",
+            administrativeArea: "NY"
         )
 
         let spot = Spot()
@@ -49,6 +61,9 @@ final class PublicRecordMappingTests: XCTestCase {
         XCTAssertEqual(spot.title, "Hidden cafe")
         XCTAssertEqual(spot.publisherUserRecordName, "user-42")
         XCTAssertEqual(spot.city, "Brooklyn")
+        XCTAssertEqual(spot.publicTagNames, ["hidden-gem"])
+        XCTAssertFalse(spot.containsCannabis)
+        XCTAssertEqual(spot.countryCode, "US")
     }
 
     func testUserProfileRoundTripFields() {

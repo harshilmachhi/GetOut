@@ -8,16 +8,21 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     static let nycCenter = CLLocationCoordinate2D(latitude: 40.7128, longitude: -74.0060)
     static let defaultSpan = MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
     static let userCenterSpan = MKCoordinateSpan(latitudeDelta: 0.015, longitudeDelta: 0.015)
-    private static let maxAcceptableHorizontalAccuracy: CLLocationAccuracy = 100
+    nonisolated private static let maxAcceptableHorizontalAccuracy: CLLocationAccuracy = 100
 
     static var defaultRegion: MKCoordinateRegion {
         MKCoordinateRegion(center: nycCenter, span: defaultSpan)
     }
 
     private let manager = CLLocationManager()
+    private let geocoder = CLGeocoder()
+    private var lastJurisdictionLocation: CLLocation?
 
     var authorizationStatus: CLAuthorizationStatus = .notDetermined
     var lastLocation: CLLocation?
+    private(set) var countryCode = ""
+    private(set) var administrativeArea = ""
+    private(set) var isResolvingJurisdiction = false
 
     override init() {
         super.init()
@@ -71,10 +76,32 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         guard let location = bestLocation else { return }
         Task { @MainActor in
             lastLocation = location
+            await resolveJurisdictionIfNeeded(for: location)
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Location unavailable — keep last known or fall back to default region.
+    }
+
+    private func resolveJurisdictionIfNeeded(for location: CLLocation) async {
+        if let lastJurisdictionLocation,
+           location.distance(from: lastJurisdictionLocation) < 1_000,
+           !countryCode.isEmpty {
+            return
+        }
+
+        lastJurisdictionLocation = location
+        isResolvingJurisdiction = true
+        defer { isResolvingJurisdiction = false }
+
+        do {
+            let placemark = try await geocoder.reverseGeocodeLocation(location).first
+            countryCode = placemark?.isoCountryCode?.uppercased() ?? ""
+            administrativeArea = placemark?.administrativeArea?.uppercased() ?? ""
+        } catch {
+            countryCode = ""
+            administrativeArea = ""
+        }
     }
 }
