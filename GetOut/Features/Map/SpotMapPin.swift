@@ -3,6 +3,7 @@ import SwiftUI
 struct SpotMapPin: View {
     let category: SpotCategory
     var isSelected: Bool = false
+    var isSaved: Bool = false
     var size: CGFloat = 36
 
     var body: some View {
@@ -12,7 +13,7 @@ struct SpotMapPin: View {
                 .frame(width: size, height: size)
                 .overlay {
                     Circle()
-                        .strokeBorder(Color.white.opacity(isSelected ? 1 : 0.85), lineWidth: isSelected ? 3 : 2)
+                        .strokeBorder(isSaved ? Theme.Colors.accentGreen : Color.white.opacity(isSelected ? 1 : 0.85), lineWidth: isSelected ? 3 : 2)
                 }
                 .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
 

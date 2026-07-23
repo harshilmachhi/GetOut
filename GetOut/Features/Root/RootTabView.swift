@@ -31,6 +31,7 @@ struct RootTabView: View {
     @Environment(SessionStore.self) private var session
     @State private var selectedTab: AppTab = .discover
     @State private var socialCoordinator = PublicSocialCoordinator.shared
+    @State private var tabResetID = UUID()
     @Namespace private var tabIndicator
 
     var body: some View {
@@ -40,7 +41,8 @@ struct RootTabView: View {
 
             CustomTabBar(
                 selectedTab: $selectedTab,
-                namespace: tabIndicator
+                namespace: tabIndicator,
+                onReselect: resetCurrentTab
             )
         }
         .background(Theme.Colors.appBackground)
@@ -56,18 +58,22 @@ struct RootTabView: View {
             NavigationStack {
                 DiscoverView()
             }
+            .id(tabResetID)
         case .trips:
             NavigationStack {
                 accountProtected { TripsView() }
             }
+            .id(tabResetID)
         case .add:
             NavigationStack {
                 accountProtected { AddSpotView() }
             }
+            .id(tabResetID)
         case .profile:
             NavigationStack {
                 accountProtected { ProfileView() }
             }
+            .id(tabResetID)
         }
     }
 
@@ -79,11 +85,17 @@ struct RootTabView: View {
             OnboardingFlowView()
         }
     }
+
+    private func resetCurrentTab() {
+        // A second tap on a bottom-tab item returns that section to its root screen.
+        tabResetID = UUID()
+    }
 }
 
 private struct CustomTabBar: View {
     @Binding var selectedTab: AppTab
     var namespace: Namespace.ID
+    let onReselect: () -> Void
 
     private let indicatorWidth: CGFloat = 52
     private let indicatorHeight: CGFloat = 34
@@ -110,6 +122,9 @@ private struct CustomTabBar: View {
     private func tabButton(for tab: AppTab) -> some View {
         Button {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                if selectedTab == tab {
+                    onReselect()
+                }
                 selectedTab = tab
             }
         } label: {

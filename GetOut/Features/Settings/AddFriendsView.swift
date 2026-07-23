@@ -57,7 +57,7 @@ struct AddFriendsView: View {
                 .font(Theme.Typography.serifDisplay(size: 28))
                 .foregroundStyle(Theme.Colors.textOnDarkPrimary)
 
-            Text("Follow friends to see where they love to go and get better recommendations.")
+            Text("Follow friends to keep up with people you know. Community reviews and spots are available to everyone.")
                 .font(Theme.Typography.body())
                 .foregroundStyle(Theme.Colors.textOnDarkSecondary)
         }

@@ -32,7 +32,12 @@ struct PublicDiscoverFeedSection: View {
     private var sectionContent: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             HStack {
-                SectionHeader(title: "Public feed")
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    SectionHeader(title: "Community reviews")
+                    Text("Available to everyone — following is optional.")
+                        .font(Theme.Typography.caption())
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                }
 
                 Spacer()
 

@@ -30,19 +30,22 @@ struct DiscoverView: View {
         SpotCategory.allCases.map { CategoryChip(category: $0) }
     }
 
-    private var candidateSpots: [Spot] {
+    private var visibleSpots: [Spot] {
         let blocked = Set(userBlocks.map(\.blockedUserRecordName))
         let allowsCannabis = CannabisPolicy.canAccess(
             ageConfirmed: hasConfirmedCannabisLegalAge,
             countryCode: locationManager.countryCode,
             administrativeArea: locationManager.administrativeArea
         )
-        let visible = allSpots.filter {
+        return allSpots.filter {
             !blocked.contains($0.publisherUserRecordName)
                 && (allowsCannabis || !$0.containsCannabis)
         }
-        guard selectedCategory != .nearby else { return visible }
-        return visible.filter { $0.categoryEnum == selectedCategory }
+    }
+
+    private var candidateSpots: [Spot] {
+        guard selectedCategory != .nearby else { return visibleSpots }
+        return visibleSpots.filter { $0.categoryEnum == selectedCategory }
     }
 
     private var rankedSpots: [ScoredSpot] {
@@ -119,7 +122,7 @@ struct DiscoverView: View {
             SettingsView()
         }
         .fullScreenCover(isPresented: $showMapExplore) {
-            MapExploreView()
+            MapExploreView(spots: visibleSpots)
         }
         .task {
             locationManager.requestPermission()

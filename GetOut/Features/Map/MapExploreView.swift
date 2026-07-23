@@ -4,7 +4,11 @@ import SwiftUI
 
 struct MapExploreView: View {
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \Spot.rating, order: .reverse) private var spots: [Spot]
+    @Environment(SessionStore.self) private var session
+    @Query(sort: \Profile.createdAt) private var profiles: [Profile]
+    @Query(sort: \Save.createdAt, order: .reverse) private var saves: [Save]
+
+    let spots: [Spot]
 
     @State private var locationManager = LocationManager()
     @State private var cameraPosition: MapCameraPosition = .region(LocationManager.defaultRegion)
@@ -14,6 +18,28 @@ struct MapExploreView: View {
 
     private var mappableSpots: [Spot] {
         spots.filter { $0.mapCoordinate != nil }
+    }
+
+    private var currentProfileID: UUID? {
+        (profiles.first { $0.username == session.currentUsername } ?? profiles.first)?.id
+    }
+
+    private var savedSpots: [Spot] {
+        guard let currentProfileID else { return [] }
+        let savedIDs = Set(saves.compactMap { save -> UUID? in
+            guard save.user?.id == currentProfileID,
+                  save.list == SaveList.saved.rawValue else { return nil }
+            return save.spot?.id
+        })
+        return mappableSpots.filter { savedIDs.contains($0.id) }
+    }
+
+    private var savedNearbySpots: [Spot] {
+        guard let userLocation = locationManager.lastLocation else { return savedSpots }
+        return savedSpots.filter { spot in
+            guard let coordinate = spot.mapCoordinate else { return false }
+            return userLocation.distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)) <= 25_000
+        }
     }
 
     var body: some View {
@@ -36,6 +62,10 @@ struct MapExploreView: View {
                 .padding(.bottom, Theme.Spacing.lg)
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            } else if !savedNearbySpots.isEmpty {
+                savedNearbyStrip
+                    .padding(.bottom, Theme.Spacing.lg)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
             }
         }
         .background(Theme.Colors.appBackground)
@@ -65,7 +95,8 @@ struct MapExploreView: View {
                         } label: {
                             SpotMapPin(
                                 category: spot.categoryEnum,
-                                isSelected: selectedSpot?.id == spot.id
+                                isSelected: selectedSpot?.id == spot.id,
+                                isSaved: savedSpots.contains(spot)
                             )
                         }
                         .buttonStyle(.plain)
@@ -116,6 +147,42 @@ struct MapExploreView: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .safeAreaPadding(.top, Theme.Spacing.sm)
+    }
+
+    private var savedNearbyStrip: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Label("Saved nearby", systemImage: "bookmark.fill")
+                .font(Theme.Typography.caption().weight(.semibold))
+                .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                .padding(.horizontal, Theme.Spacing.md)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    ForEach(savedNearbySpots) { spot in
+                        Button {
+                            selectedSpot = spot
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(spot.title)
+                                    .font(Theme.Typography.body().weight(.semibold))
+                                    .lineLimit(1)
+                                Text(spot.neighborhood.isEmpty ? "Saved spot" : spot.neighborhood)
+                                    .font(Theme.Typography.caption())
+                                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                            .frame(width: 180, alignment: .leading)
+                            .padding(Theme.Spacing.md)
+                            .background(Theme.Colors.cardSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.md)
+            }
+        }
     }
 
     private func centerOnUserTapped() {
@@ -189,7 +256,7 @@ private struct SpotMapPreviewCard: View {
 }
 
 #Preview {
-    MapExploreView()
-        .modelContainer(for: [Profile.self, Spot.self, Tag.self, Like.self], inMemory: true)
+    MapExploreView(spots: [])
+        .modelContainer(for: [Profile.self, Spot.self, Tag.self, Like.self, Save.self], inMemory: true)
         .preferredColorScheme(.dark)
 }
