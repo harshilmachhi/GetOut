@@ -1,3 +1,4 @@
+import Contacts
 import CoreLocation
 import MapKit
 import PhotosUI
@@ -12,9 +13,13 @@ struct AddSpotView: View {
     @Query(sort: \Profile.createdAt) private var allProfiles: [Profile]
 
     @State private var locationManager = LocationManager()
-    @State private var cameraPosition: MapCameraPosition = .region(LocationManager.defaultRegion)
+    @State private var locationSearch = LocationSearchService()
     @State private var selectedCoordinate: CLLocationCoordinate2D?
-    @State private var didSetInitialRegion = false
+    @State private var selectedLocation: ResolvedLocation?
+    @State private var locationQuery = ""
+    @State private var address = ""
+    @State private var showPinPicker = false
+    @State private var isResolvingSearch = false
 
     @State private var title = ""
     @State private var details = ""
@@ -96,10 +101,6 @@ struct AddSpotView: View {
         .navigationBarTitleDisplayMode(.large)
         .task {
             locationManager.requestPermission()
-            updateCameraIfNeeded()
-        }
-        .onChange(of: locationManager.lastLocation) { _, _ in
-            updateCameraIfNeeded()
         }
         .onChange(of: photoPickerItem) { _, newItem in
             loadPhoto(from: newItem)
@@ -132,6 +133,11 @@ struct AddSpotView: View {
         } message: {
             Text("Your public profile and this exact pinned location will be visible to everyone using GetOut.")
         }
+        .sheet(isPresented: $showPinPicker) {
+            PinLocationPicker(initialCoordinate: pinPickerInitialCoordinate) { coordinate in
+                selectDroppedPin(coordinate)
+            }
+        }
     }
 
     // MARK: - Sections
@@ -141,64 +147,124 @@ struct AddSpotView: View {
             stepHeader(
                 number: 1,
                 title: "Location",
-                subtitle: "Drop a pin where this spot is — drag the map to place it."
+                subtitle: "Search for a real place, or pin somewhere that isn’t listed."
             )
 
-            ZStack {
-                Map(position: $cameraPosition)
-                    .mapStyle(.standard(elevation: .flat))
-                    .onMapCameraChange(frequency: .onEnd) { context in
-                        selectedCoordinate = context.region.center
-                        scheduleGeocode(for: context.region.center)
-                    }
-
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 36))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(Theme.Colors.textOnDarkPrimary, Theme.Colors.accentGreen)
-                    .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
-                    .allowsHitTesting(false)
-            }
-            .frame(height: 260)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
-            .overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.card)
-                    .stroke(Theme.Colors.cream.opacity(0.12), lineWidth: 1)
-            }
-
-            HStack(spacing: Theme.Spacing.sm) {
-                Button(action: recenterOnUserLocation) {
-                    Label("Use current location", systemImage: "location.fill")
-                        .font(Theme.Typography.caption().weight(.medium))
-                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                        .padding(.horizontal, Theme.Spacing.md)
-                        .padding(.vertical, Theme.Spacing.sm)
-                        .background(Theme.Colors.cardSurface)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Button(action: lookupArea) {
-                    Label("Look up area", systemImage: "magnifyingglass")
-                        .font(Theme.Typography.caption().weight(.medium))
-                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                        .padding(.horizontal, Theme.Spacing.md)
-                        .padding(.vertical, Theme.Spacing.sm)
-                        .background(Theme.Colors.cardSurface)
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .disabled(selectedCoordinate == nil || isGeocoding)
-                .opacity(selectedCoordinate == nil || isGeocoding ? 0.5 : 1)
-            }
-
             VStack(spacing: Theme.Spacing.sm) {
-                TextField("Neighborhood", text: $neighborhood)
-                    .cardInputStyle()
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                    TextField("Search for a place or address", text: $locationQuery)
+                        .font(Theme.Typography.body())
+                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .onChange(of: locationQuery) { _, query in
+                            locationSearch.update(query: query, near: searchRegion)
+                        }
+                }
+                .padding(Theme.Spacing.md)
+                .background(Theme.Colors.cardSurface)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
 
-                TextField("City", text: $city)
-                    .cardInputStyle()
+                if isResolvingSearch {
+                    ProgressView()
+                        .tint(Theme.Colors.accentGreen)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, Theme.Spacing.sm)
+                } else if !locationSearch.suggestions.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(locationSearch.suggestions) { suggestion in
+                            Button { resolveLocation(suggestion) } label: {
+                                HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+                                    Image(systemName: "mappin.and.ellipse")
+                                        .foregroundStyle(Theme.Colors.accentGreen)
+                                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                                        Text(suggestion.title)
+                                            .font(Theme.Typography.body().weight(.medium))
+                                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                                        if !suggestion.subtitle.isEmpty {
+                                            Text(suggestion.subtitle)
+                                                .font(Theme.Typography.caption())
+                                                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                                        }
+                                    }
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(Theme.Spacing.md)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+
+                            if suggestion.id != locationSearch.suggestions.last?.id {
+                                Divider().overlay(Theme.Colors.cream.opacity(0.12))
+                            }
+                        }
+                    }
+                    .background(Theme.Colors.cardSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                }
             }
+
+            if selectedCoordinate != nil {
+                selectedLocationCard()
+            }
+
+            Button { showPinPicker = true } label: {
+                Label("Pin an unlisted place", systemImage: "mappin")
+                    .font(Theme.Typography.caption().weight(.semibold))
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .background(Theme.Colors.cardSurface)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+
+            if let searchError = locationSearch.searchError {
+                Text(searchError)
+                    .font(Theme.Typography.caption())
+                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+            }
+        }
+    }
+
+    private func selectedLocationCard() -> some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.md) {
+            Image(systemName: selectedLocation == nil ? "mappin" : "mappin.circle.fill")
+                .font(.title3)
+                .foregroundStyle(Theme.Colors.accentGreen)
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text(selectedLocation?.name ?? "Pinned location")
+                    .font(Theme.Typography.body().weight(.semibold))
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                if isGeocoding {
+                    Text("Finding the nearest address…")
+                        .font(Theme.Typography.caption())
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                } else if !address.isEmpty {
+                    Text(address)
+                        .font(Theme.Typography.caption())
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                        .lineLimit(2)
+                } else {
+                    Text("Exact coordinates selected")
+                        .font(Theme.Typography.caption())
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                }
+            }
+            Spacer(minLength: 0)
+            Button("Adjust") { showPinPicker = true }
+                .font(Theme.Typography.caption().weight(.semibold))
+                .foregroundStyle(Theme.Colors.accentGreen)
+                .buttonStyle(.plain)
+        }
+        .padding(Theme.Spacing.md)
+        .background(Theme.Colors.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.control)
+                .stroke(Theme.Colors.cream.opacity(0.12), lineWidth: 1)
         }
     }
 
@@ -446,26 +512,55 @@ struct AddSpotView: View {
 
     // MARK: - Actions
 
-    private func updateCameraIfNeeded() {
-        guard !didSetInitialRegion else { return }
-        let region = locationManager.defaultMapRegion
-        cameraPosition = .region(region)
-        selectedCoordinate = region.center
-        didSetInitialRegion = true
-        scheduleGeocode(for: region.center)
+    private var searchRegion: MKCoordinateRegion {
+        locationManager.defaultMapRegion
     }
 
-    private func recenterOnUserLocation() {
-        guard let region = locationManager.centerOnUser() else { return }
-        withAnimation {
-            cameraPosition = .region(region)
+    private var pinPickerInitialCoordinate: CLLocationCoordinate2D? {
+        selectedCoordinate ?? locationManager.lastLocation?.coordinate
+    }
+
+    private func resolveLocation(_ suggestion: LocationSearchSuggestion) {
+        guard !isResolvingSearch else { return }
+        isResolvingSearch = true
+
+        Task {
+            defer { isResolvingSearch = false }
+            do {
+                let resolved = try await locationSearch.resolve(suggestion)
+                applyResolvedLocation(resolved)
+            } catch {
+                formError = error.localizedDescription
+            }
         }
-        selectedCoordinate = region.center
-        scheduleGeocode(for: region.center)
     }
 
-    private func lookupArea() {
-        guard let coordinate = selectedCoordinate else { return }
+    private func applyResolvedLocation(_ location: ResolvedLocation) {
+        selectedLocation = location
+        selectedCoordinate = location.coordinate
+        address = location.address
+        city = location.city
+        neighborhood = location.neighborhood
+        countryCode = location.countryCode
+        administrativeArea = location.administrativeArea
+        locationQuery = ""
+        locationSearch.clear()
+
+        if let name = location.name, !name.isEmpty {
+            title = name
+        }
+    }
+
+    private func selectDroppedPin(_ coordinate: CLLocationCoordinate2D) {
+        selectedLocation = nil
+        selectedCoordinate = coordinate
+        address = ""
+        city = ""
+        neighborhood = ""
+        countryCode = ""
+        administrativeArea = ""
+        locationQuery = ""
+        locationSearch.clear()
         scheduleGeocode(for: coordinate, immediate: true)
     }
 
@@ -503,6 +598,15 @@ struct AddSpotView: View {
             } else if let adminArea = placemark.administrativeArea, !adminArea.isEmpty {
                 city = adminArea
             }
+            address = placemark.postalAddress.map {
+                LocationAddressFormatter.make(
+                    street: $0.street,
+                    city: $0.city,
+                    administrativeArea: $0.state,
+                    postalCode: $0.postalCode,
+                    country: $0.country
+                )
+            } ?? placemark.name ?? ""
             countryCode = placemark.isoCountryCode ?? ""
             administrativeArea = placemark.administrativeArea ?? ""
         } catch {
@@ -578,6 +682,7 @@ struct AddSpotView: View {
         spot.details = details.trimmingCharacters(in: .whitespacesAndNewlines)
         spot.latitude = coordinate.latitude
         spot.longitude = coordinate.longitude
+        spot.address = address.trimmingCharacters(in: .whitespacesAndNewlines)
         spot.neighborhood = neighborhood.trimmingCharacters(in: .whitespacesAndNewlines)
         spot.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
         spot.category = inferredCategory(from: selectedTagNames).rawValue
@@ -644,6 +749,12 @@ struct AddSpotView: View {
         newTagName = ""
         photoPickerItem = nil
         photoData = nil
+        selectedCoordinate = nil
+        selectedLocation = nil
+        locationQuery = ""
+        address = ""
+        neighborhood = ""
+        city = ""
         countryCode = ""
         administrativeArea = ""
         formError = nil
