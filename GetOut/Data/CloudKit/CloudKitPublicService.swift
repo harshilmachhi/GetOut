@@ -1,6 +1,6 @@
 import Foundation
 
-/// Public CloudKit database access for social feed, profiles, and following.
+/// Public CloudKit database access for the feed and public profiles.
 /// UI depends on this protocol only — never on CloudKit types directly.
 protocol CloudKitPublicService {
     func currentUserRecordName() async throws -> String?
@@ -15,23 +15,6 @@ protocol CloudKitPublicService {
     func deleteAccountData(userRecordName: String) async throws
     func submitReport(_ draft: PublicReportDraft, reporterUserRecordName: String) async throws
 
-    func follow(userRecordName: String, currentUserRecordName: String) async throws
-    func unfollow(userRecordName: String, currentUserRecordName: String) async throws
-    func isFollowing(userRecordName: String, currentUserRecordName: String) async throws -> Bool
-
-    func fetchFollowers(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage
-
-    func fetchFollowing(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage
-
-    func socialCounts(for userRecordName: String) async throws -> PublicSocialCounts
 }
 
 enum CloudKitPublicServiceFactory {

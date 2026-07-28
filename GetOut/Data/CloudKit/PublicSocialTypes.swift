@@ -41,6 +41,7 @@ struct PublicSpotDTO: Equatable, Sendable, Identifiable {
     let neighborhood: String
     let category: String
     let rating: Double
+    let photoData: [Data]
     let createdAt: Date
     let ownerUserRecordName: String
     let ownerDisplayName: String
@@ -62,6 +63,7 @@ struct PublicSpotDTO: Equatable, Sendable, Identifiable {
         neighborhood: String,
         category: String,
         rating: Double,
+        photoData: [Data] = [],
         createdAt: Date,
         ownerUserRecordName: String,
         ownerDisplayName: String,
@@ -82,6 +84,7 @@ struct PublicSpotDTO: Equatable, Sendable, Identifiable {
         self.neighborhood = neighborhood
         self.category = category
         self.rating = rating
+        self.photoData = photoData
         self.createdAt = createdAt
         self.ownerUserRecordName = ownerUserRecordName
         self.ownerDisplayName = ownerDisplayName
@@ -93,6 +96,7 @@ struct PublicSpotDTO: Equatable, Sendable, Identifiable {
     }
 
     var id: String { recordName }
+
 }
 
 enum PublicReportTargetKind: String, Sendable {
@@ -144,15 +148,6 @@ struct PublicUserProfileDTO: Equatable, Sendable, Identifiable {
     var id: String { recordName }
 }
 
-struct PublicFollowDTO: Equatable, Sendable, Identifiable {
-    let recordName: String
-    let followerUserRecordName: String
-    let followeeUserRecordName: String
-    let createdAt: Date
-
-    var id: String { recordName }
-}
-
 struct PublicFeedCursor: Equatable, Sendable {
     let token: String
 
@@ -164,46 +159,6 @@ struct PublicFeedCursor: Equatable, Sendable {
 struct PublicFeedPage: Equatable, Sendable {
     let spots: [PublicSpotDTO]
     let nextCursor: PublicFeedCursor?
-}
-
-struct PublicFollowListCursor: Equatable, Sendable {
-    let token: String
-}
-
-struct PublicFollowListPage: Equatable, Sendable {
-    let profiles: [PublicUserProfileDTO]
-    let nextCursor: PublicFollowListCursor?
-}
-
-struct PublicSocialCounts: Equatable, Sendable {
-    let followers: Int
-    let following: Int
-}
-
-enum FollowToggleState: Equatable, Sendable {
-    case notFollowing
-    case following
-    case pending
-
-    static func afterToggle(from current: FollowToggleState, success: Bool) -> FollowToggleState {
-        guard success else { return current == .pending ? .notFollowing : current }
-        switch current {
-        case .notFollowing, .pending:
-            return .following
-        case .following:
-            return .notFollowing
-        }
-    }
-
-    static func afterUnfollow(from current: FollowToggleState, success: Bool) -> FollowToggleState {
-        guard success else { return current == .pending ? .following : current }
-        switch current {
-        case .following, .pending:
-            return .notFollowing
-        case .notFollowing:
-            return .notFollowing
-        }
-    }
 }
 
 enum PublicFeedPager {

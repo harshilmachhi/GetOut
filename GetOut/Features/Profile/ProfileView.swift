@@ -3,7 +3,7 @@ import SwiftUI
 
 private enum ProfileSegment: String, CaseIterable, Identifiable {
     case loved = "Loved"
-    case saved = "Saved"
+    case created = "Created"
     case been = "Been"
     case cities = "Cities"
 
@@ -12,7 +12,7 @@ private enum ProfileSegment: String, CaseIterable, Identifiable {
     var emptyMessage: String {
         switch self {
         case .loved: "No loved spots yet"
-        case .saved: "No saved spots yet"
+        case .created: "No created spots yet"
         case .been: "No been-there spots yet"
         case .cities: "No cities yet"
         }
@@ -26,15 +26,16 @@ struct ProfileView: View {
     @Query(sort: \Spot.createdAt) private var allSpots: [Spot]
     @Query(sort: \Like.createdAt, order: .reverse) private var allLikes: [Like]
     @Query(sort: \Save.createdAt, order: .reverse) private var allSaves: [Save]
-    @Query private var allFollows: [Follow]
+    @Query private var blockedUsers: [UserBlock]
 
     @State private var selectedSegment: ProfileSegment = .loved
     @State private var selectedSpot: Spot?
+    @State private var spotPendingDeletion: Spot?
+    @State private var deletionError: String?
     @State private var socialCoordinator = PublicSocialCoordinator.shared
-    @State private var socialListKind: PublicSocialListKind?
 
     private var profile: Profile? {
-        profiles.first(where: { $0.username == session.currentUsername }) ?? profiles.first
+        session.currentProfile(in: profiles)
     }
 
     private var profileID: UUID? { profile?.id }
@@ -51,13 +52,6 @@ struct ProfileView: View {
             .compactMap(\.spot)
     }
 
-    private var savedSpots: [Spot] {
-        guard let profileID else { return [] }
-        return allSaves
-            .filter { $0.user?.id == profileID && $0.list == SaveList.saved.rawValue }
-            .compactMap(\.spot)
-    }
-
     private var beenSpots: [Spot] {
         guard let profileID else { return [] }
         return allSaves
@@ -66,43 +60,11 @@ struct ProfileView: View {
     }
 
     private var cityGroups: [(city: String, spots: [Spot])] {
-        let combined = uniqueSpots([lovedSpots, savedSpots, beenSpots, ownedSpots].flatMap { $0 })
+        let combined = uniqueSpots([lovedSpots, beenSpots, ownedSpots].flatMap { $0 })
         let grouped = Dictionary(grouping: combined.filter { !$0.city.isEmpty }) { $0.city }
         return grouped
             .map { (city: $0.key, spots: $0.value) }
             .sorted { $0.city.localizedCaseInsensitiveCompare($1.city) == .orderedAscending }
-    }
-
-    private var followerCount: Int {
-        if FeatureFlags.publicSocialEnabled, let profile {
-            if profile.publicFollowerCount > 0 {
-                return profile.publicFollowerCount
-            }
-            if !profile.cloudKitUserRecordName.isEmpty {
-                return PublicSocialCacheStore.publicFollowerCount(
-                    for: profile.cloudKitUserRecordName,
-                    in: modelContext
-                )
-            }
-        }
-        guard let profileID else { return 0 }
-        return allFollows.filter { $0.followee?.id == profileID }.count
-    }
-
-    private var followingCount: Int {
-        if FeatureFlags.publicSocialEnabled, let profile {
-            if profile.publicFollowingCount > 0 {
-                return profile.publicFollowingCount
-            }
-            if !profile.cloudKitUserRecordName.isEmpty {
-                return PublicSocialCacheStore.publicFollowingCount(
-                    for: profile.cloudKitUserRecordName,
-                    in: modelContext
-                )
-            }
-        }
-        guard let profileID else { return 0 }
-        return allFollows.filter { $0.follower?.id == profileID }.count
     }
 
     var body: some View {
@@ -119,19 +81,34 @@ struct ProfileView: View {
         .navigationDestination(item: $selectedSpot) { spot in
             SpotDetailView(spot: spot)
         }
-        .navigationDestination(item: $socialListKind) { kind in
-            if FeatureFlags.publicSocialEnabled,
-               let recordName = profile?.cloudKitUserRecordName,
-               !recordName.isEmpty {
-                PublicSocialListView(kind: kind, userRecordName: recordName)
-            } else if let profile {
-                LocalSocialListView(kind: kind, profile: profile)
+        .confirmationDialog(
+            "Delete \(spotPendingDeletion?.title ?? "this spot")?",
+            isPresented: Binding(
+                get: { spotPendingDeletion != nil },
+                set: { if !$0 { spotPendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete spot", role: .destructive) {
+                if let spotPendingDeletion {
+                    delete(spotPendingDeletion)
+                }
             }
+            Button("Cancel", role: .cancel) { spotPendingDeletion = nil }
+        } message: {
+            Text("This permanently deletes the spot from your collection and removes it from the public feed if it was shared.")
+        }
+        .alert("Couldn’t delete spot", isPresented: Binding(
+            get: { deletionError != nil },
+            set: { if !$0 { deletionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { deletionError = nil }
+        } message: {
+            Text(deletionError ?? "")
         }
         .task(id: profile?.id) {
             guard FeatureFlags.publicSocialEnabled, let profile else { return }
             await socialCoordinator.bootstrapIdentity(for: profile, in: modelContext)
-            await socialCoordinator.refreshProfileSocial(for: profile, in: modelContext)
         }
     }
 
@@ -141,15 +118,25 @@ struct ProfileView: View {
             VStack(spacing: Theme.Spacing.lg) {
                 ProfileHeaderCard(
                     profile: profile,
-                    spotCount: ownedSpots.count,
-                    followerCount: followerCount,
-                    followingCount: followingCount,
-                    onFollowersTap: { socialListKind = .followers },
-                    onFollowingTap: { socialListKind = .following }
+                    spotCount: ownedSpots.count
                 )
 
-                if FeatureFlags.publicSocialEnabled, let message = socialCoordinator.profileSocialError {
-                    PublicSocialInlineMessage(message: message)
+                HStack(spacing: Theme.Spacing.sm) {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        ProfileManagementButton(title: "Settings", symbol: "gearshape")
+                    }
+
+                    NavigationLink {
+                        BlockedPeopleView()
+                    } label: {
+                        ProfileManagementButton(
+                            title: "Blocked people",
+                            symbol: "hand.raised.fill",
+                            detail: blockedUsers.isEmpty ? nil : "\(blockedUsers.count)"
+                        )
+                    }
                 }
 
                 Picker("Profile section", selection: $selectedSegment) {
@@ -173,8 +160,12 @@ struct ProfileView: View {
             ProfileSpotGrid(spots: lovedSpots, emptyMessage: ProfileSegment.loved.emptyMessage) {
                 selectedSpot = $0
             }
-        case .saved:
-            ProfileSpotGrid(spots: savedSpots, emptyMessage: ProfileSegment.saved.emptyMessage) {
+        case .created:
+            ProfileSpotGrid(
+                spots: ownedSpots,
+                emptyMessage: ProfileSegment.created.emptyMessage,
+                onDelete: { spotPendingDeletion = $0 }
+            ) {
                 selectedSpot = $0
             }
         case .been:
@@ -190,6 +181,57 @@ struct ProfileView: View {
         var seen = Set<UUID>()
         return spots.filter { seen.insert($0.id).inserted }
     }
+
+    private func delete(_ spot: Spot) {
+        spotPendingDeletion = nil
+
+        Task {
+            if FeatureFlags.publicSocialEnabled,
+               !spot.publicRecordName.isEmpty,
+               !(await socialCoordinator.unpublishSpot(spot, in: modelContext)) {
+                deletionError = socialCoordinator.publishError ?? "The spot could not be removed from the public feed."
+                return
+            }
+
+            profile?.spots?.removeAll { $0.id == spot.id }
+            modelContext.delete(spot)
+
+            do {
+                try modelContext.save()
+            } catch {
+                deletionError = "The spot could not be deleted. Please try again."
+            }
+        }
+    }
+}
+
+private struct ProfileManagementButton: View {
+    let title: String
+    let symbol: String
+    var detail: String?
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.semibold))
+            Text(title)
+                .font(Theme.Typography.caption().weight(.semibold))
+            if let detail {
+                Text(detail)
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Theme.Colors.textOnDarkPrimary.opacity(0.12))
+                    .clipShape(Capsule())
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+        .padding(Theme.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Colors.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+    }
 }
 
 // MARK: - Header
@@ -197,10 +239,6 @@ struct ProfileView: View {
 private struct ProfileHeaderCard: View {
     let profile: Profile
     let spotCount: Int
-    let followerCount: Int
-    let followingCount: Int
-    var onFollowersTap: (() -> Void)?
-    var onFollowingTap: (() -> Void)?
 
     var body: some View {
         VStack(spacing: Theme.Spacing.md) {
@@ -230,53 +268,22 @@ private struct ProfileHeaderCard: View {
                 }
             }
 
-            HStack(spacing: Theme.Spacing.xl) {
+            HStack {
                 ProfileStatItem(value: spotCount, label: "Spots")
-                ProfileStatItem(value: followerCount, label: "Followers", action: onFollowersTap)
-                ProfileStatItem(value: followingCount, label: "Following", action: onFollowingTap)
             }
             .padding(.top, Theme.Spacing.sm)
         }
         .frame(maxWidth: .infinity)
         .padding(Theme.Spacing.lg)
         .card()
-        .overlay(alignment: .topTrailing) {
-            NavigationLink {
-                AddFriendsView()
-            } label: {
-                Image(systemName: "person.badge.plus")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.accentGreen)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.Colors.accentGreen.opacity(0.14))
-                    .clipShape(Circle())
-                    .overlay {
-                        Circle()
-                            .stroke(Theme.Colors.accentGreen.opacity(0.45), lineWidth: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-            .padding(Theme.Spacing.sm)
-        }
     }
 }
 
 private struct ProfileStatItem: View {
     let value: Int
     let label: String
-    var action: (() -> Void)?
-
     var body: some View {
-        Group {
-            if let action {
-                Button(action: action) {
-                    statContent
-                }
-                .buttonStyle(.plain)
-            } else {
-                statContent
-            }
-        }
+        statContent
     }
 
     private var statContent: some View {
@@ -297,6 +304,7 @@ private struct ProfileStatItem: View {
 private struct ProfileSpotGrid: View {
     let spots: [Spot]
     let emptyMessage: String
+    var onDelete: ((Spot) -> Void)? = nil
     let onSelect: (Spot) -> Void
 
     private let columns = [
@@ -310,8 +318,26 @@ private struct ProfileSpotGrid: View {
         } else {
             LazyVGrid(columns: columns, spacing: Theme.Spacing.sm) {
                 ForEach(Array(spots.enumerated()), id: \.element.id) { index, spot in
-                    ProfileSpotTile(spot: spot, gradientIndex: index) {
-                        onSelect(spot)
+                    ZStack(alignment: .topTrailing) {
+                        ProfileSpotTile(spot: spot, gradientIndex: index) {
+                            onSelect(spot)
+                        }
+
+                        if let onDelete {
+                            Button {
+                                onDelete(spot)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.black.opacity(0.6))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(Theme.Spacing.sm)
+                            .accessibilityLabel("Delete \(spot.title)")
+                        }
                     }
                 }
             }
@@ -469,7 +495,7 @@ private struct ProfileMissingState: View {
 
 #Preview {
     let container = try! ModelContainer(
-        for: Profile.self, Spot.self, Tag.self, Like.self, Save.self, Follow.self,
+        for: Profile.self, Spot.self, Tag.self, Like.self, Save.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let context = container.mainContext

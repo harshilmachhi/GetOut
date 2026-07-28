@@ -4,6 +4,7 @@ import SwiftUI
 /// When CloudKit sync imports remote writes, merge them into the active `ModelContext`
 /// so `@Query` views refresh. SwiftData already observes the store; this handles the
 /// `NSPersistentStoreRemoteChange` edge where pending merges need explicit processing.
+@MainActor
 private struct CloudKitRemoteChangeObserver: ViewModifier {
     @Environment(\.modelContext) private var modelContext
 
@@ -12,7 +13,9 @@ private struct CloudKitRemoteChangeObserver: ViewModifier {
             .onReceive(
                 NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)
             ) { _ in
-                modelContext.processPendingChanges()
+                Task { @MainActor in
+                    modelContext.processPendingChanges()
+                }
             }
     }
 }

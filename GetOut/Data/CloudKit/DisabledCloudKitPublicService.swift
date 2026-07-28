@@ -29,35 +29,4 @@ final class DisabledCloudKitPublicService: CloudKitPublicService {
         throw PublicSocialError.disabled
     }
 
-    func follow(userRecordName: String, currentUserRecordName: String) async throws {
-        throw PublicSocialError.disabled
-    }
-
-    func unfollow(userRecordName: String, currentUserRecordName: String) async throws {
-        throw PublicSocialError.disabled
-    }
-
-    func isFollowing(userRecordName: String, currentUserRecordName: String) async throws -> Bool {
-        false
-    }
-
-    func fetchFollowers(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage {
-        PublicFollowListPage(profiles: [], nextCursor: nil)
-    }
-
-    func fetchFollowing(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage {
-        PublicFollowListPage(profiles: [], nextCursor: nil)
-    }
-
-    func socialCounts(for userRecordName: String) async throws -> PublicSocialCounts {
-        PublicSocialCounts(followers: 0, following: 0)
-    }
 }

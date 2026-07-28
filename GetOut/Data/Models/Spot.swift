@@ -15,6 +15,10 @@ final class Spot {
     var category: String = SpotCategory.views.rawValue
     var photoSystemImage: String = "photo"
     @Attribute(.externalStorage) var photoData: Data?
+    @Attribute(.externalStorage) var photoData2: Data?
+    @Attribute(.externalStorage) var photoData3: Data?
+    @Attribute(.externalStorage) var photoData4: Data?
+    @Attribute(.externalStorage) var photoData5: Data?
     var rating: Double = 0
     var visitHour: Int = -1
     var visitWeekday: Int = -1
@@ -43,6 +47,9 @@ final class Spot {
     @Relationship(inverse: \Interaction.spot)
     var interactions: [Interaction]?
 
+    @Relationship(deleteRule: .cascade, inverse: \Rating.spot)
+    var ratings: [Rating]?
+
     @Transient
     var categoryEnum: SpotCategory {
         get { SpotCategory(rawValue: category) ?? .views }
@@ -59,6 +66,23 @@ final class Spot {
     var displayTagNames: [String] {
         let localNames = tags?.map(\.name) ?? []
         return Array(Set(localNames + publicTagNames)).sorted()
+    }
+
+    @Transient
+    var allPhotoData: [Data] {
+        [photoData, photoData2, photoData3, photoData4, photoData5].compactMap { $0 }
+    }
+
+    @Transient
+    var ratingCount: Int {
+        ratings?.count ?? 0
+    }
+
+    @Transient
+    var averageRating: Double {
+        let values = ratings?.map(\.stars) ?? []
+        guard !values.isEmpty else { return rating }
+        return Double(values.reduce(0, +)) / Double(values.count)
     }
 
     init() {}

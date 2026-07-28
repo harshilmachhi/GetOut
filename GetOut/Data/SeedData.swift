@@ -167,29 +167,6 @@ enum SeedData {
             profilesByUsername[spec.username] = profile
         }
 
-        let followEdges: [(String, String)] = [
-            ("harshil", "alex"),
-            ("harshil", "maya"),
-            ("maya", "alex"),
-            ("maya", "jordan"),
-            ("jordan", "maya"),
-            ("jordan", "sam"),
-            ("alex", "maya"),
-            ("alex", "riley"),
-            ("sam", "jordan"),
-            ("riley", "alex"),
-        ]
-
-        for (followerUsername, followeeUsername) in followEdges {
-            guard let follower = profilesByUsername[followerUsername],
-                  let followee = profilesByUsername[followeeUsername] else { continue }
-
-            let follow = Follow()
-            follow.follower = follower
-            follow.followee = followee
-            context.insert(follow)
-        }
-
         try? context.save()
     }
 

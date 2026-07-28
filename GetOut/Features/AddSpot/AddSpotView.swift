@@ -34,8 +34,8 @@ struct AddSpotView: View {
     @State private var showSuccess = false
     @State private var geocodeTask: Task<Void, Never>?
 
-    @State private var photoPickerItem: PhotosPickerItem?
-    @State private var photoData: Data?
+    @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var photoData: [Data] = []
     @State private var formError: String?
     @State private var showCannabisAgeConfirmation = false
     @State private var showPublicationConfirmation = false
@@ -67,7 +67,7 @@ struct AddSpotView: View {
     }
 
     private var demoProfile: Profile? {
-        allProfiles.first { $0.username == session.currentUsername } ?? allProfiles.first
+        session.currentProfile(in: allProfiles)
     }
 
     private var suggestedTags: [Tag] {
@@ -102,8 +102,8 @@ struct AddSpotView: View {
         .task {
             locationManager.requestPermission()
         }
-        .onChange(of: photoPickerItem) { _, newItem in
-            loadPhoto(from: newItem)
+        .onChange(of: photoPickerItems) { _, newItems in
+            loadPhotos(from: newItems)
         }
         .alert("Legal-age confirmation", isPresented: $showCannabisAgeConfirmation) {
             Button("I am of legal age") {
@@ -230,34 +230,50 @@ struct AddSpotView: View {
     }
 
     private func selectedLocationCard() -> some View {
-        HStack(alignment: .top, spacing: Theme.Spacing.md) {
-            Image(systemName: selectedLocation == nil ? "mappin" : "mappin.circle.fill")
-                .font(.title3)
-                .foregroundStyle(Theme.Colors.accentGreen)
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                Text(selectedLocation?.name ?? "Pinned location")
-                    .font(Theme.Typography.body().weight(.semibold))
-                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                if isGeocoding {
-                    Text("Finding the nearest address…")
-                        .font(Theme.Typography.caption())
-                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
-                } else if !address.isEmpty {
-                    Text(address)
-                        .font(Theme.Typography.caption())
-                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
-                        .lineLimit(2)
-                } else {
-                    Text("Exact coordinates selected")
-                        .font(Theme.Typography.caption())
-                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            if let coordinate = selectedCoordinate {
+                Map(position: .constant(.region(MKCoordinateRegion(
+                    center: coordinate,
+                    span: LocationManager.userCenterSpan
+                )))) {
+                    Marker(selectedLocation?.name ?? "Selected location", coordinate: coordinate)
+                        .tint(Theme.Colors.accentGreen)
                 }
+                .mapStyle(.standard(elevation: .flat))
+                .allowsHitTesting(false)
+                .frame(height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
             }
-            Spacer(minLength: 0)
-            Button("Adjust") { showPinPicker = true }
-                .font(Theme.Typography.caption().weight(.semibold))
-                .foregroundStyle(Theme.Colors.accentGreen)
-                .buttonStyle(.plain)
+
+            HStack(alignment: .top, spacing: Theme.Spacing.md) {
+                Image(systemName: selectedLocation == nil ? "mappin" : "mappin.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.Colors.accentGreen)
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text(selectedLocation?.name ?? "Pinned location")
+                        .font(Theme.Typography.body().weight(.semibold))
+                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                    if isGeocoding {
+                        Text("Finding the nearest address…")
+                            .font(Theme.Typography.caption())
+                            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                    } else if !address.isEmpty {
+                        Text(address)
+                            .font(Theme.Typography.caption())
+                            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                            .lineLimit(2)
+                    } else {
+                        Text("Exact coordinates selected")
+                            .font(Theme.Typography.caption())
+                            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                    }
+                }
+                Spacer(minLength: 0)
+                Button("Adjust") { showPinPicker = true }
+                    .font(Theme.Typography.caption().weight(.semibold))
+                    .foregroundStyle(Theme.Colors.accentGreen)
+                    .buttonStyle(.plain)
+            }
         }
         .padding(Theme.Spacing.md)
         .background(Theme.Colors.cardSurface)
@@ -344,92 +360,47 @@ struct AddSpotView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             stepHeader(
                 number: 4,
-                title: "Photo",
-                subtitle: "A great shot helps others picture the vibe."
+                title: "Photos",
+                subtitle: "Add up to 5 photos. The first one is the cover."
             )
 
-            ZStack(alignment: .topTrailing) {
-                PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                    photoPickerContent
+            if !photoData.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        ForEach(Array(photoData.enumerated()), id: \.offset) { index, data in
+                            if let image = UIImage(data: data) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 150, height: 120)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                                    .overlay(alignment: .topTrailing) {
+                                        Button { photoData.remove(at: index) } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.title3)
+                                                .symbolRenderingMode(.palette)
+                                                .foregroundStyle(.white, Color.black.opacity(0.6))
+                                        }
+                                        .padding(Theme.Spacing.xs)
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if photoData.count < 5 {
+                PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 5 - photoData.count, matching: .images) {
+                    Label(photoData.isEmpty ? "Add photos" : "Add more photos", systemImage: "photo.badge.plus")
+                        .font(Theme.Typography.body().weight(.medium))
+                        .foregroundStyle(Theme.Colors.accentGreen)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 72)
+                        .background(Theme.Colors.cardSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
                 }
                 .buttonStyle(.plain)
-
-                if photoData != nil {
-                    Button {
-                        photoPickerItem = nil
-                        photoData = nil
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(Theme.Colors.textOnDarkPrimary, Color.black.opacity(0.55))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(Theme.Spacing.sm)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var photoPickerContent: some View {
-        Group {
-            if let photoData, let uiImage = UIImage(data: photoData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                ZStack {
-                    Theme.Colors.cardSurface
-                    VStack(spacing: Theme.Spacing.sm) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 32))
-                            .foregroundStyle(Theme.Colors.accentGreen)
-
-                        Text("Add photo")
-                            .font(Theme.Typography.body().weight(.medium))
-                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-
-                        Text("Tap to choose from your library")
-                            .font(Theme.Typography.caption())
-                            .foregroundStyle(Theme.Colors.textOnDarkSecondary)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 220)
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
-        .overlay {
-            if photoData != nil {
-                RoundedRectangle(cornerRadius: Theme.Radius.card)
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.55)],
-                            startPoint: .center,
-                            endPoint: .bottom
-                        )
-                    )
-                    .allowsHitTesting(false)
-            } else {
-                RoundedRectangle(cornerRadius: Theme.Radius.card)
-                    .strokeBorder(
-                        Theme.Colors.cream.opacity(0.28),
-                        style: StrokeStyle(lineWidth: 2, dash: [10, 8])
-                    )
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if photoData != nil {
-                Label("Change photo", systemImage: "photo.on.rectangle")
-                    .font(Theme.Typography.caption().weight(.semibold))
-                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                    .padding(.bottom, Theme.Spacing.md)
             }
         }
     }
@@ -687,7 +658,11 @@ struct AddSpotView: View {
         spot.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
         spot.category = inferredCategory(from: selectedTagNames).rawValue
         spot.rating = 0
-        spot.photoData = photoData
+        spot.photoData = photoData.first
+        spot.photoData2 = photoData.dropFirst().first
+        spot.photoData3 = photoData.dropFirst(2).first
+        spot.photoData4 = photoData.dropFirst(3).first
+        spot.photoData5 = photoData.dropFirst(4).first
         spot.visitHour = calendar.component(.hour, from: now)
         spot.visitWeekday = calendar.component(.weekday, from: now)
         spot.owner = profile
@@ -747,8 +722,8 @@ struct AddSpotView: View {
         details = ""
         selectedTagNames = []
         newTagName = ""
-        photoPickerItem = nil
-        photoData = nil
+        photoPickerItems = []
+        photoData = []
         selectedCoordinate = nil
         selectedLocation = nil
         locationQuery = ""
@@ -760,17 +735,18 @@ struct AddSpotView: View {
         formError = nil
     }
 
-    private func loadPhoto(from item: PhotosPickerItem?) {
-        guard let item else {
-            photoData = nil
-            return
-        }
-
+    private func loadPhotos(from items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
         Task {
-            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
-            let processed = downscaledJPEG(from: data)
+            var loaded: [Data] = []
+            for item in items {
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let processed = downscaledJPEG(from: data) else { continue }
+                loaded.append(processed)
+            }
             await MainActor.run {
-                photoData = processed
+                photoData.append(contentsOf: loaded.prefix(5 - photoData.count))
+                photoPickerItems = []
             }
         }
     }

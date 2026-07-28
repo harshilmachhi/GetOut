@@ -29,6 +29,29 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
     func publishSpot(_ spot: Spot, owner: Profile, ownerUserRecordName: String) async throws -> PublicSpotDTO {
         guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
         let record = PublicRecordMapping.makeSpotRecord(from: spot, owner: owner, ownerUserRecordName: ownerUserRecordName)
+
+        var temporaryAssetURLs: [URL] = []
+        var photoAssets: [CKAsset] = []
+        for (index, photoData) in spot.allPhotoData.prefix(5).enumerated() {
+            let fileURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("getout-spot-\(UUID().uuidString)-\(index + 1)")
+                .appendingPathExtension("jpg")
+            do {
+                try photoData.write(to: fileURL, options: .atomic)
+                photoAssets.append(CKAsset(fileURL: fileURL))
+                temporaryAssetURLs.append(fileURL)
+            } catch {
+                temporaryAssetURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+                throw PublicSocialError.partialFailure("Could not prepare the spot photo for upload.")
+            }
+        }
+        defer {
+            temporaryAssetURLs.forEach { try? FileManager.default.removeItem(at: $0) }
+        }
+        if !photoAssets.isEmpty {
+            record[PublicCloudKitSchema.SpotField.photo] = photoAssets as CKRecordValue
+        }
+
         let saved = try await save(record: record)
         guard let dto = PublicRecordMapping.spotDTO(from: saved) else {
             throw PublicSocialError.partialFailure("Could not read published spot.")
@@ -151,29 +174,10 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
     func deleteAccountData(userRecordName: String) async throws {
         guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
 
-        // Incoming follow records are owned by the followers under Creator-write permissions.
-        // Leave an authenticated, non-public cleanup request before removing the profile so the
-        // developer can erase those remaining references from CloudKit Dashboard.
-        try await submitReport(
-            PublicReportDraft(
-                targetRecordName: "profile-\(userRecordName)",
-                targetOwnerUserRecordName: userRecordName,
-                targetKind: .profile,
-                reason: .other,
-                details: "ACCOUNT_DELETION: remove incoming PublicFollow references after profile deletion."
-            ),
-            reporterUserRecordName: userRecordName
-        )
-
         var idsToDelete: [CKRecord.ID] = [CKRecord.ID(recordName: "profile-\(userRecordName)")]
         idsToDelete += try await recordIDs(
             recordType: PublicCloudKitSchema.RecordType.spot,
             field: PublicCloudKitSchema.SpotField.ownerUserRecordName,
-            value: userRecordName
-        )
-        idsToDelete += try await recordIDs(
-            recordType: PublicCloudKitSchema.RecordType.follow,
-            field: PublicCloudKitSchema.FollowField.followerUserRecordName,
             value: userRecordName
         )
         idsToDelete += try await recordIDs(
@@ -189,85 +193,6 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
                 throw mapError(error)
             }
         }
-    }
-
-    func follow(userRecordName: String, currentUserRecordName: String) async throws {
-        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        let record = PublicRecordMapping.makeFollowRecord(
-            followerUserRecordName: currentUserRecordName,
-            followeeUserRecordName: userRecordName
-        )
-        _ = try await save(record: record)
-    }
-
-    func unfollow(userRecordName: String, currentUserRecordName: String) async throws {
-        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        let recordName = PublicCloudKitSchema.followRecordName(
-            follower: currentUserRecordName,
-            followee: userRecordName
-        )
-        let recordID = CKRecord.ID(recordName: recordName)
-        do {
-            try await publicDatabase.deleteRecord(withID: recordID)
-        } catch let error as CKError where error.code == .unknownItem {
-            return
-        } catch {
-            throw mapError(error)
-        }
-    }
-
-    func isFollowing(userRecordName: String, currentUserRecordName: String) async throws -> Bool {
-        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        let recordName = PublicCloudKitSchema.followRecordName(
-            follower: currentUserRecordName,
-            followee: userRecordName
-        )
-        do {
-            _ = try await publicDatabase.record(for: CKRecord.ID(recordName: recordName))
-            return true
-        } catch let error as CKError where error.code == .unknownItem {
-            return false
-        } catch {
-            throw mapError(error)
-        }
-    }
-
-    func fetchFollowers(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage {
-        try await fetchFollowProfiles(
-            field: PublicCloudKitSchema.FollowField.followeeUserRecordName,
-            userRecordName: userRecordName,
-            cursor: cursor,
-            pageSize: pageSize
-        )
-    }
-
-    func fetchFollowing(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage {
-        try await fetchFollowProfiles(
-            field: PublicCloudKitSchema.FollowField.followerUserRecordName,
-            userRecordName: userRecordName,
-            cursor: cursor,
-            pageSize: pageSize
-        )
-    }
-
-    func socialCounts(for userRecordName: String) async throws -> PublicSocialCounts {
-        async let followers = countFollowRecords(
-            field: PublicCloudKitSchema.FollowField.followeeUserRecordName,
-            value: userRecordName
-        )
-        async let following = countFollowRecords(
-            field: PublicCloudKitSchema.FollowField.followerUserRecordName,
-            value: userRecordName
-        )
-        return try await PublicSocialCounts(followers: followers, following: following)
     }
 
     // MARK: - Private
@@ -337,139 +262,6 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
         }
     }
 
-    private func fetchFollowProfiles(
-        field: String,
-        userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage {
-        if let cursor, let ckCursor = storedCKCursor(for: cursor.token) {
-            return try await fetchFollowPage(with: ckCursor, pageSize: pageSize, otherField: oppositeFollowField(for: field))
-        }
-
-        let predicate = NSPredicate(format: "%K == %@", field, userRecordName)
-        let query = CKQuery(recordType: PublicCloudKitSchema.RecordType.follow, predicate: predicate)
-        query.sortDescriptors = [NSSortDescriptor(key: PublicCloudKitSchema.FollowField.createdAt, ascending: false)]
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let operation = CKQueryOperation(query: query)
-            operation.resultsLimit = pageSize
-
-            var followRecords: [CKRecord] = []
-            operation.recordMatchedBlock = { _, result in
-                if case .success(let record) = result {
-                    followRecords.append(record)
-                }
-            }
-            operation.queryResultBlock = { result in
-                Task {
-                    do {
-                        switch result {
-                        case .success(let nextCursor):
-                            let profiles = try await self.profiles(for: followRecords, otherField: self.oppositeFollowField(for: field))
-                            let token = UUID().uuidString
-                            if let nextCursor {
-                                self.storeCKCursor(nextCursor, token: token)
-                            }
-                            continuation.resume(returning: PublicFollowListPage(
-                                profiles: profiles,
-                                nextCursor: nextCursor.map { _ in PublicFollowListCursor(token: token) }
-                            ))
-                        case .failure(let error):
-                            continuation.resume(throwing: self.mapError(error))
-                        }
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-            self.publicDatabase.add(operation)
-        }
-    }
-
-    private func fetchFollowPage(
-        with cursor: CKQueryOperation.Cursor,
-        pageSize: Int,
-        otherField: String
-    ) async throws -> PublicFollowListPage {
-        try await withCheckedThrowingContinuation { continuation in
-            let operation = CKQueryOperation(cursor: cursor)
-            operation.resultsLimit = pageSize
-
-            var followRecords: [CKRecord] = []
-            operation.recordMatchedBlock = { _, result in
-                if case .success(let record) = result {
-                    followRecords.append(record)
-                }
-            }
-            operation.queryResultBlock = { result in
-                Task {
-                    do {
-                        switch result {
-                        case .success(let nextCursor):
-                            let profiles = try await self.profiles(for: followRecords, otherField: otherField)
-                            let token = UUID().uuidString
-                            if let nextCursor {
-                                self.storeCKCursor(nextCursor, token: token)
-                            }
-                            continuation.resume(returning: PublicFollowListPage(
-                                profiles: profiles,
-                                nextCursor: nextCursor.map { _ in PublicFollowListCursor(token: token) }
-                            ))
-                        case .failure(let error):
-                            continuation.resume(throwing: self.mapError(error))
-                        }
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-            self.publicDatabase.add(operation)
-        }
-    }
-
-    private func profiles(for followRecords: [CKRecord], otherField: String) async throws -> [PublicUserProfileDTO] {
-        var profiles: [PublicUserProfileDTO] = []
-        for followRecord in followRecords {
-            guard let userRecordName = followRecord[otherField] as? String else { continue }
-            if let profile = try await fetchPublicProfile(userRecordName: userRecordName) {
-                profiles.append(profile)
-            }
-        }
-        return profiles
-    }
-
-    private func oppositeFollowField(for field: String) -> String {
-        field == PublicCloudKitSchema.FollowField.followerUserRecordName
-            ? PublicCloudKitSchema.FollowField.followeeUserRecordName
-            : PublicCloudKitSchema.FollowField.followerUserRecordName
-    }
-
-    private func countFollowRecords(field: String, value: String) async throws -> Int {
-        let predicate = NSPredicate(format: "%K == %@", field, value)
-        let query = CKQuery(recordType: PublicCloudKitSchema.RecordType.follow, predicate: predicate)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let operation = CKQueryOperation(query: query)
-            operation.desiredKeys = []
-            var count = 0
-            operation.recordMatchedBlock = { _, result in
-                if case .success = result {
-                    count += 1
-                }
-            }
-            operation.queryResultBlock = { result in
-                switch result {
-                case .success:
-                    continuation.resume(returning: count)
-                case .failure(let error):
-                    continuation.resume(throwing: self.mapError(error))
-                }
-            }
-            self.publicDatabase.add(operation)
-        }
-    }
-
     private func recordIDs(recordType: String, field: String, value: String) async throws -> [CKRecord.ID] {
         let predicate = NSPredicate(format: "%K == %@", field, value)
         let query = CKQuery(recordType: recordType, predicate: predicate)
@@ -530,10 +322,29 @@ final class CloudKitPublicServiceLive: CloudKitPublicService, @unchecked Sendabl
                 return .rateLimited
             case .unknownItem:
                 return .notFound
+            case .partialFailure:
+                return .underlying(cloudKitFailureDescription(for: ckError))
+            case .permissionFailure, .serverRejectedRequest:
+                return .underlying(cloudKitFailureDescription(for: ckError))
             default:
                 return .underlying(ckError.localizedDescription)
             }
         }
         return .underlying(error.localizedDescription)
+    }
+
+    /// CKDatabase.save can wrap the useful server response in `partialFailure`; the outer
+    /// localized description is only "Error saving record <CKRecordID...>". Surface the
+    /// nested error so a rejected request can be diagnosed from the app itself.
+    private func cloudKitFailureDescription(for error: CKError) -> String {
+        let code = error.code.rawValue
+        if let partialErrors = error.userInfo[CKPartialErrorsByItemIDKey] as? [AnyHashable: Error],
+           let nestedError = partialErrors.values.first {
+            if let nestedCloudKitError = nestedError as? CKError {
+                return "CloudKit rejected this request (\(nestedCloudKitError.code.rawValue)): \(nestedCloudKitError.localizedDescription)"
+            }
+            return "CloudKit rejected this request (\(code)): \(nestedError.localizedDescription)"
+        }
+        return "CloudKit rejected this request (\(code)): \(error.localizedDescription)"
     }
 }

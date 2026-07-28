@@ -85,6 +85,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     private func resolveJurisdictionIfNeeded(for location: CLLocation) async {
+        guard !isResolvingJurisdiction else { return }
         if let lastJurisdictionLocation,
            location.distance(from: lastJurisdictionLocation) < 1_000,
            !countryCode.isEmpty {

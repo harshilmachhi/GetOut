@@ -36,9 +36,11 @@ struct TasteQuestionnaireView: View {
     @Environment(SessionStore.self) private var session
 
     let username: String
+    let userRecordName: String
 
     @State private var selectedCategories: Set<String> = []
     @State private var selectedTags: Set<String> = []
+    @State private var finishError: String?
 
     private var categoryOptions: [SpotCategory] {
         SpotCategory.allCases.filter { $0 != .nearby }
@@ -85,6 +87,12 @@ struct TasteQuestionnaireView: View {
                     }
                 }
 
+                if let finishError {
+                    Text(finishError)
+                        .font(Theme.Typography.caption())
+                        .foregroundStyle(.red.opacity(0.9))
+                }
+
                 Button(action: saveAndFinish) {
                     Text("Finish")
                         .font(Theme.Typography.body().weight(.semibold))
@@ -127,18 +135,26 @@ struct TasteQuestionnaireView: View {
 
     private func saveAndFinish() {
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        var descriptor = FetchDescriptor<Profile>(
-            predicate: #Predicate { $0.username == trimmedUsername }
+        guard !trimmedUsername.isEmpty, !userRecordName.isEmpty else {
+            finishError = "Your iCloud profile was not linked correctly. Go back and try creating it again."
+            return
+        }
+
+        // Profile creation already succeeded in the previous step. Taste preferences are a
+        // best-effort private update and must not be able to trap the user in onboarding.
+        if let profiles = try? modelContext.fetch(FetchDescriptor<Profile>()),
+           let profile = profiles.first(where: {
+               $0.cloudKitUserRecordName == userRecordName
+           }) {
+            profile.preferredCategories = Array(selectedCategories).sorted()
+            profile.preferredTags = Array(selectedTags).sorted()
+            try? modelContext.save()
+        }
+
+        session.completeOnboarding(
+            username: trimmedUsername,
+            userRecordName: userRecordName
         )
-        descriptor.fetchLimit = 1
-
-        guard let profile = try? modelContext.fetch(descriptor).first else { return }
-
-        profile.preferredCategories = Array(selectedCategories).sorted()
-        profile.preferredTags = Array(selectedTags).sorted()
-        try? modelContext.save()
-
-        session.completeOnboarding(username: trimmedUsername)
     }
 }
 

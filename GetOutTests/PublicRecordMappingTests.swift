@@ -31,6 +31,26 @@ final class PublicRecordMappingTests: XCTestCase {
         XCTAssertEqual(dto?.administrativeArea, "ON")
     }
 
+    func testSpotDTOReadsPhotoAssetBeforeCloudKitTemporaryFileExpires() throws {
+        let expectedPhoto = Data([0xFF, 0xD8, 0xFF, 0xD9])
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("getout-mapping-test-\(UUID().uuidString).jpg")
+        try expectedPhoto.write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let record = CKRecord(
+            recordType: PublicCloudKitSchema.RecordType.spot,
+            recordID: CKRecord.ID(recordName: "spot-photo")
+        )
+        record[PublicCloudKitSchema.SpotField.spotID] = UUID().uuidString as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.title] = "Photo spot" as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.createdAt] = Date.now as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.ownerUserRecordName] = "user-photo" as CKRecordValue
+        record[PublicCloudKitSchema.SpotField.photo] = [CKAsset(fileURL: fileURL)] as CKRecordValue
+
+        XCTAssertEqual(PublicRecordMapping.spotDTO(from: record)?.photoData, [expectedPhoto])
+    }
+
     func testApplySpotDTOToModel() {
         let dto = PublicSpotDTO(
             recordName: "spot-1",
@@ -85,21 +105,37 @@ final class PublicRecordMappingTests: XCTestCase {
         XCTAssertEqual(profile.displayName, "Alex")
     }
 
-    func testFollowRecordNameIsStable() {
-        let name = PublicCloudKitSchema.followRecordName(follower: "a", followee: "b")
-        XCTAssertEqual(name, "follow-a-b")
+    @MainActor
+    func testSessionSelectsProfileByCloudKitIdentityInsteadOfFirstProfile() {
+        let session = SessionStore()
+        session.clearLocalProfileState()
 
-        let dto = PublicFollowDTO(
-            recordName: name,
-            followerUserRecordName: "a",
-            followeeUserRecordName: "b",
-            createdAt: .now
+        let unrelated = Profile()
+        unrelated.username = "harshil"
+        unrelated.cloudKitUserRecordName = "icloud-harshil"
+
+        let current = Profile()
+        current.username = "parth-test"
+        current.cloudKitUserRecordName = "icloud-parth-test"
+
+        session.completeOnboarding(
+            username: current.username,
+            userRecordName: current.cloudKitUserRecordName
         )
-        let follow = Follow()
-        PublicRecordMapping.apply(dto, to: follow)
 
-        XCTAssertTrue(follow.isPublicSocialFollow)
-        XCTAssertEqual(follow.followerUserRecordName, "a")
-        XCTAssertEqual(follow.followeeUserRecordName, "b")
+        XCTAssertTrue(session.currentProfile(in: [unrelated, current]) === current)
+        session.clearLocalProfileState()
+    }
+
+    @MainActor
+    func testSessionNeverFallsBackToAnUnrelatedFirstProfile() {
+        let session = SessionStore()
+        session.clearLocalProfileState()
+
+        let unrelated = Profile()
+        unrelated.username = "harshil"
+        unrelated.cloudKitUserRecordName = "icloud-harshil"
+
+        XCTAssertNil(session.currentProfile(in: [unrelated]))
     }
 }

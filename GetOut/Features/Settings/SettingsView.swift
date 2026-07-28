@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var coordinator = PublicSocialCoordinator.shared
     @State private var showDeleteConfirmation = false
     @State private var deletionMessage: String?
+    @Query private var blockedUsers: [UserBlock]
     @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
 
     private let privacyURL = URL(string: "https://parthdhroovji.me/GetOut")!
@@ -18,7 +19,7 @@ struct SettingsView: View {
         List {
             accountSection
             preferencesSection
-            friendsSection
+            blockedUsersSection
             permissionsSection
             aboutSection
         }
@@ -45,7 +46,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes your public profile, public spots, follows, and private GetOut data. It does not delete your Apple ID or iCloud account.")
+            Text("This removes your public profile, public spots, and private GetOut data. It does not delete your Apple ID or iCloud account.")
         }
         .alert("GetOut", isPresented: Binding(
             get: { deletionMessage != nil },
@@ -60,6 +61,15 @@ struct SettingsView: View {
     private var accountSection: some View {
         Section("Account") {
             LabeledContent("Identity", value: "iCloud")
+            if !session.currentUsername.isEmpty {
+                LabeledContent("GetOut profile", value: "@\(session.currentUsername)")
+            }
+            if !session.currentCloudKitUserRecordName.isEmpty {
+                LabeledContent(
+                    "Account code",
+                    value: String(session.currentCloudKitUserRecordName.suffix(8))
+                )
+            }
             Text("Your public GetOut profile is uniquely tied to the iCloud account signed in on this device.")
                 .font(Theme.Typography.caption())
                 .foregroundStyle(Theme.Colors.textOnDarkSecondary)
@@ -80,12 +90,15 @@ struct SettingsView: View {
         }
     }
 
-    private var friendsSection: some View {
-        Section("Community") {
+    private var blockedUsersSection: some View {
+        Section("Blocked people") {
             NavigationLink {
-                AddFriendsView()
+                BlockedPeopleView()
             } label: {
-                Label("Find Friends", systemImage: "person.badge.plus")
+                Label("Blocked People", systemImage: "hand.raised.fill")
+                Spacer()
+                Text("\(blockedUsers.count)")
+                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
             }
         }
     }
@@ -98,7 +111,7 @@ struct SettingsView: View {
                 Label("Open iOS Settings", systemImage: "gear")
             }
 
-            Text("Location powers nearby discovery and legal-jurisdiction checks. Contacts matching stays on this device.")
+            Text("Location powers nearby discovery and legal-jurisdiction checks.")
                 .font(Theme.Typography.caption())
                 .foregroundStyle(Theme.Colors.textOnDarkSecondary)
         }

@@ -11,7 +11,7 @@ enum FeatureFlags {
     /// Collaborative trips via CKShare in the shared CloudKit database (integrator Phase 2).
     static let collaborativeTripsEnabled = false
 
-    /// Public CloudKit database for social feed, profiles, and following (public-social agent).
+    /// Public CloudKit database for the community feed and profiles.
     static let publicSocialEnabled = true
 
     /// SwiftData CloudKit container (private + shared scopes).

@@ -7,8 +7,9 @@ struct MapExploreView: View {
     @Environment(SessionStore.self) private var session
     @Query(sort: \Profile.createdAt) private var profiles: [Profile]
     @Query(sort: \Save.createdAt, order: .reverse) private var saves: [Save]
+    @Query(sort: \Spot.rating, order: .reverse) private var allSpots: [Spot]
 
-    let spots: [Spot]
+    var spots: [Spot]? = nil
 
     @State private var locationManager = LocationManager()
     @State private var cameraPosition: MapCameraPosition = .region(LocationManager.defaultRegion)
@@ -17,11 +18,11 @@ struct MapExploreView: View {
     @State private var didSetInitialRegion = false
 
     private var mappableSpots: [Spot] {
-        spots.filter { $0.mapCoordinate != nil }
+        (spots ?? allSpots).filter { $0.mapCoordinate != nil }
     }
 
     private var currentProfileID: UUID? {
-        (profiles.first { $0.username == session.currentUsername } ?? profiles.first)?.id
+        session.currentProfile(in: profiles)?.id
     }
 
     private var savedSpots: [Spot] {
@@ -59,12 +60,12 @@ struct MapExploreView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, Theme.Spacing.md)
-                .padding(.bottom, Theme.Spacing.lg)
+                .padding(.bottom, 104)
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else if !savedNearbySpots.isEmpty {
                 savedNearbyStrip
-                    .padding(.bottom, Theme.Spacing.lg)
+                    .padding(.bottom, 104)
                     .frame(maxHeight: .infinity, alignment: .bottom)
             }
         }
@@ -90,16 +91,27 @@ struct MapExploreView: View {
             ForEach(mappableSpots) { spot in
                 if let coordinate = spot.mapCoordinate {
                     Annotation(spot.title, coordinate: coordinate) {
-                        Button {
-                            selectedSpot = spot
-                        } label: {
+                        VStack(spacing: 4) {
                             SpotMapPin(
                                 category: spot.categoryEnum,
                                 isSelected: selectedSpot?.id == spot.id,
                                 isSaved: savedSpots.contains(spot)
                             )
+
+                            if selectedSpot?.id == spot.id {
+                                Text(spot.title)
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(Theme.Colors.cardSurface.opacity(0.96))
+                                    .clipShape(Capsule())
+                                    .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedSpot = spot }
                     }
                 }
             }
@@ -113,17 +125,19 @@ struct MapExploreView: View {
 
     private var topBar: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                    .frame(width: 40, height: 40)
-                    .background(.ultraThinMaterial.opacity(0.85))
-                    .clipShape(Circle())
+            if spots != nil {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                        .frame(width: 40, height: 40)
+                        .background(.ultraThinMaterial.opacity(0.85))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             Text("Explore")
                 .font(.subheadline.weight(.semibold))

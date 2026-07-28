@@ -5,7 +5,6 @@ final class MockCloudKitPublicService: CloudKitPublicService, @unchecked Sendabl
     var currentUserRecordNameValue: String? = "mock-user-1"
     var spots: [PublicSpotDTO] = []
     var profiles: [String: PublicUserProfileDTO] = [:]
-    var follows: Set<String> = []
     var shouldFail = false
 
     func currentUserRecordName() async throws -> String? {
@@ -28,6 +27,7 @@ final class MockCloudKitPublicService: CloudKitPublicService, @unchecked Sendabl
             neighborhood: spot.neighborhood,
             category: spot.category,
             rating: spot.rating,
+            photoData: spot.allPhotoData,
             createdAt: spot.createdAt,
             ownerUserRecordName: ownerUserRecordName,
             ownerDisplayName: owner.displayName,
@@ -98,96 +98,10 @@ final class MockCloudKitPublicService: CloudKitPublicService, @unchecked Sendabl
     func deleteAccountData(userRecordName: String) async throws {
         profiles.removeValue(forKey: userRecordName)
         spots.removeAll { $0.ownerUserRecordName == userRecordName }
-        follows = follows.filter { !$0.contains(userRecordName) }
     }
 
     func submitReport(_ draft: PublicReportDraft, reporterUserRecordName: String) async throws {
         if shouldFail { throw PublicSocialError.offline }
     }
 
-    func follow(userRecordName: String, currentUserRecordName: String) async throws {
-        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        follows.insert(PublicCloudKitSchema.followRecordName(follower: currentUserRecordName, followee: userRecordName))
-    }
-
-    func unfollow(userRecordName: String, currentUserRecordName: String) async throws {
-        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        follows.remove(PublicCloudKitSchema.followRecordName(follower: currentUserRecordName, followee: userRecordName))
-    }
-
-    func isFollowing(userRecordName: String, currentUserRecordName: String) async throws -> Bool {
-        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        return follows.contains(PublicCloudKitSchema.followRecordName(follower: currentUserRecordName, followee: userRecordName))
-    }
-
-    func fetchFollowers(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage {
-        try await followList(for: userRecordName, cursor: cursor, pageSize: pageSize, followers: true)
-    }
-
-    func fetchFollowing(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int
-    ) async throws -> PublicFollowListPage {
-        try await followList(for: userRecordName, cursor: cursor, pageSize: pageSize, followers: false)
-    }
-
-    func socialCounts(for userRecordName: String) async throws -> PublicSocialCounts {
-        guard FeatureFlags.publicSocialEnabled else { throw PublicSocialError.disabled }
-        var followers = 0
-        var following = 0
-        for key in follows {
-            guard key.hasPrefix("follow-") else { continue }
-            let remainder = String(key.dropFirst("follow-".count))
-            let parts = remainder.split(separator: "-", maxSplits: 1).map(String.init)
-            guard parts.count == 2 else { continue }
-            if parts[1] == userRecordName { followers += 1 }
-            if parts[0] == userRecordName { following += 1 }
-        }
-        return PublicSocialCounts(followers: followers, following: following)
-    }
-
-    private func followList(
-        for userRecordName: String,
-        cursor: PublicFollowListCursor?,
-        pageSize: Int,
-        followers: Bool
-    ) async throws -> PublicFollowListPage {
-        let keys = follows.filter { key in
-            if followers {
-                key.hasSuffix("-\(userRecordName)")
-            } else {
-                key.hasPrefix("follow-\(userRecordName)-")
-            }
-        }.sorted()
-        let start = cursor.flatMap { PublicFeedPager.pageIndex(from: PublicFeedCursor(token: $0.token)) * pageSize } ?? 0
-        let end = min(start + pageSize, keys.count)
-        let slice = start < keys.count ? Array(keys[start..<end]) : []
-        let listedProfiles = slice.compactMap { key -> PublicUserProfileDTO? in
-            let otherName: String
-            if followers {
-                otherName = key.replacingOccurrences(of: "follow-", with: "").components(separatedBy: "-").first ?? ""
-            } else {
-                otherName = key.replacingOccurrences(of: "follow-\(userRecordName)-", with: "")
-            }
-            return profiles[otherName] ?? PublicUserProfileDTO(
-                recordName: "profile-\(otherName)",
-                userRecordName: otherName,
-                username: otherName,
-                displayName: otherName,
-                bio: "",
-                avatarSystemImage: "person.fill",
-                createdAt: .now
-            )
-        }
-        let hasMore = end < keys.count
-        return PublicFollowListPage(
-            profiles: listedProfiles,
-            nextCursor: hasMore ? PublicFollowListCursor(token: "page-\(start / pageSize + 1)") : nil
-        )
-    }
 }

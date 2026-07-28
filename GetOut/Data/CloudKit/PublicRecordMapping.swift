@@ -26,6 +26,7 @@ enum PublicRecordMapping {
             neighborhood: record[PublicCloudKitSchema.SpotField.neighborhood] as? String ?? "",
             category: record[PublicCloudKitSchema.SpotField.category] as? String ?? SpotCategory.views.rawValue,
             rating: record[PublicCloudKitSchema.SpotField.rating] as? Double ?? 0,
+            photoData: photoData(from: record[PublicCloudKitSchema.SpotField.photo] as? [CKAsset]),
             createdAt: createdAt,
             ownerUserRecordName: ownerUserRecordName,
             ownerDisplayName: record[PublicCloudKitSchema.SpotField.ownerDisplayName] as? String ?? "",
@@ -73,6 +74,11 @@ enum PublicRecordMapping {
         spot.neighborhood = dto.neighborhood
         spot.category = dto.category
         spot.rating = dto.rating
+        spot.photoData = dto.photoData.indices.contains(0) ? dto.photoData[0] : nil
+        spot.photoData2 = dto.photoData.indices.contains(1) ? dto.photoData[1] : nil
+        spot.photoData3 = dto.photoData.indices.contains(2) ? dto.photoData[2] : nil
+        spot.photoData4 = dto.photoData.indices.contains(3) ? dto.photoData[3] : nil
+        spot.photoData5 = dto.photoData.indices.contains(4) ? dto.photoData[4] : nil
         spot.createdAt = dto.createdAt
         spot.publicRecordName = dto.recordName
         spot.publisherUserRecordName = dto.ownerUserRecordName
@@ -80,6 +86,13 @@ enum PublicRecordMapping {
         spot.containsCannabis = dto.containsCannabis
         spot.countryCode = dto.countryCode
         spot.administrativeArea = dto.administrativeArea
+    }
+
+    private static func photoData(from assets: [CKAsset]?) -> [Data] {
+        (assets ?? []).compactMap { asset in
+            guard let fileURL = asset.fileURL else { return nil }
+            return try? Data(contentsOf: fileURL, options: .mappedIfSafe)
+        }
     }
 
     // MARK: - User profile
@@ -123,46 +136,6 @@ enum PublicRecordMapping {
         profile.bio = dto.bio
         profile.avatarSystemImage = dto.avatarSystemImage
         profile.createdAt = dto.createdAt
-    }
-
-    // MARK: - Follow
-
-    static func followDTO(from record: CKRecord) -> PublicFollowDTO? {
-        guard record.recordType == PublicCloudKitSchema.RecordType.follow,
-              let follower = record[PublicCloudKitSchema.FollowField.followerUserRecordName] as? String,
-              let followee = record[PublicCloudKitSchema.FollowField.followeeUserRecordName] as? String,
-              let createdAt = record[PublicCloudKitSchema.FollowField.createdAt] as? Date else {
-            return nil
-        }
-
-        return PublicFollowDTO(
-            recordName: record.recordID.recordName,
-            followerUserRecordName: follower,
-            followeeUserRecordName: followee,
-            createdAt: createdAt
-        )
-    }
-
-    static func makeFollowRecord(followerUserRecordName: String, followeeUserRecordName: String) -> CKRecord {
-        let recordName = PublicCloudKitSchema.followRecordName(
-            follower: followerUserRecordName,
-            followee: followeeUserRecordName
-        )
-        let record = CKRecord(
-            recordType: PublicCloudKitSchema.RecordType.follow,
-            recordID: CKRecord.ID(recordName: recordName)
-        )
-        record[PublicCloudKitSchema.FollowField.followerUserRecordName] = followerUserRecordName as CKRecordValue
-        record[PublicCloudKitSchema.FollowField.followeeUserRecordName] = followeeUserRecordName as CKRecordValue
-        record[PublicCloudKitSchema.FollowField.createdAt] = Date.now as CKRecordValue
-        return record
-    }
-
-    static func apply(_ dto: PublicFollowDTO, to follow: Follow) {
-        follow.followerUserRecordName = dto.followerUserRecordName
-        follow.followeeUserRecordName = dto.followeeUserRecordName
-        follow.createdAt = dto.createdAt
-        follow.isPublicSocialFollow = true
     }
 
     static func makeReportRecord(

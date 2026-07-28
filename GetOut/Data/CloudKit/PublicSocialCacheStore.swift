@@ -31,23 +31,6 @@ enum PublicSocialCacheStore {
         return profile
     }
 
-    static func upsertFollow(_ dto: PublicFollowDTO, in context: ModelContext) {
-        if fetchPublicFollow(recordName: dto.recordName, in: context) != nil {
-            return
-        }
-
-        let follow = Follow()
-        PublicRecordMapping.apply(dto, to: follow)
-        context.insert(follow)
-    }
-
-    static func removeFollow(follower: String, followee: String, in context: ModelContext) {
-        let recordName = PublicCloudKitSchema.followRecordName(follower: follower, followee: followee)
-        if let follow = fetchPublicFollow(recordName: recordName, in: context) {
-            context.delete(follow)
-        }
-    }
-
     static func syncFeedPage(_ page: PublicFeedPage, in context: ModelContext) {
         for dto in page.spots {
             let spot = upsertSpot(dto, in: context)
@@ -68,28 +51,19 @@ enum PublicSocialCacheStore {
         try? context.save()
     }
 
-    static func updateSocialCounts(
-        for profile: Profile,
-        counts: PublicSocialCounts,
-        in context: ModelContext
-    ) {
-        profile.publicFollowerCount = counts.followers
-        profile.publicFollowingCount = counts.following
-        try? context.save()
-    }
-
-    static func publicFollowerCount(for userRecordName: String, in context: ModelContext) -> Int {
-        let descriptor = FetchDescriptor<Follow>(
-            predicate: #Predicate { $0.isPublicSocialFollow && $0.followeeUserRecordName == userRecordName }
+    /// Makes the local public-feed cache match CloudKit. This removes records that were
+    /// deleted on another device instead of leaving them visible indefinitely.
+    static func reconcilePublicFeed(_ spots: [PublicSpotDTO], in context: ModelContext) {
+        let liveRecordNames = Set(spots.map(\.recordName))
+        let descriptor = FetchDescriptor<Spot>(
+            predicate: #Predicate { !$0.publicRecordName.isEmpty }
         )
-        return (try? context.fetchCount(descriptor)) ?? 0
-    }
 
-    static func publicFollowingCount(for userRecordName: String, in context: ModelContext) -> Int {
-        let descriptor = FetchDescriptor<Follow>(
-            predicate: #Predicate { $0.isPublicSocialFollow && $0.followerUserRecordName == userRecordName }
-        )
-        return (try? context.fetchCount(descriptor)) ?? 0
+        for spot in (try? context.fetch(descriptor)) ?? [] where !liveRecordNames.contains(spot.publicRecordName) {
+            context.delete(spot)
+        }
+
+        syncFeedPage(PublicFeedPage(spots: spots, nextCursor: nil), in: context)
     }
 
     static func cachedPublicFeedSpots(
@@ -118,6 +92,15 @@ enum PublicSocialCacheStore {
         try? context.save()
     }
 
+    static func unblock(userRecordName: String, in context: ModelContext) {
+        guard !userRecordName.isEmpty else { return }
+        let blocks = (try? context.fetch(FetchDescriptor<UserBlock>())) ?? []
+        for block in blocks where block.blockedUserRecordName == userRecordName {
+            context.delete(block)
+        }
+        try? context.save()
+    }
+
     private static func fetchSpot(publicRecordName: String, in context: ModelContext) -> Spot? {
         var descriptor = FetchDescriptor<Spot>(
             predicate: #Predicate { $0.publicRecordName == publicRecordName }
@@ -142,21 +125,4 @@ enum PublicSocialCacheStore {
         return try? context.fetch(descriptor).first
     }
 
-    private static func fetchPublicFollow(recordName: String, in context: ModelContext) -> Follow? {
-        let followerPrefix = recordName
-        var descriptor = FetchDescriptor<Follow>(
-            predicate: #Predicate { follow in
-                follow.isPublicSocialFollow
-                    && follow.followerUserRecordName != ""
-                    && follow.followeeUserRecordName != ""
-            }
-        )
-        let follows = (try? context.fetch(descriptor)) ?? []
-        return follows.first {
-            PublicCloudKitSchema.followRecordName(
-                follower: $0.followerUserRecordName,
-                followee: $0.followeeUserRecordName
-            ) == followerPrefix
-        }
-    }
 }

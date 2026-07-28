@@ -41,11 +41,11 @@ struct GetOutApp: App {
             Tag.self,
             Like.self,
             Save.self,
-            Follow.self,
             Trip.self,
             TripStop.self,
             Interaction.self,
             UserBlock.self,
+            Rating.self,
         ])
 
         do {

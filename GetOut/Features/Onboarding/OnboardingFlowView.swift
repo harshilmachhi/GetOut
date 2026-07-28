@@ -6,6 +6,7 @@ struct OnboardingFlowView: View {
     @State private var username = ""
     @State private var city = ""
     @State private var bio = ""
+    @State private var createdUserRecordName = ""
 
     var body: some View {
         Group {
@@ -15,11 +16,15 @@ struct OnboardingFlowView: View {
                     username: $username,
                     city: $city,
                     bio: $bio
-                ) {
+                ) { profile in
+                    createdUserRecordName = profile.cloudKitUserRecordName
                     step = 1
                 }
             } else {
-                TasteQuestionnaireView(username: username)
+                TasteQuestionnaireView(
+                    username: username,
+                    userRecordName: createdUserRecordName
+                )
             }
         }
         .animation(.easeInOut(duration: 0.25), value: step)

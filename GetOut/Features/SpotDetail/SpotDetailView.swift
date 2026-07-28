@@ -14,11 +14,14 @@ struct SpotDetailView: View {
     @State private var showAddToTrip = false
     @State private var socialCoordinator = PublicSocialCoordinator.shared
     @State private var safetyMessage: String?
+    @State private var selectedPhotoIndex = 0
+    @State private var selectedRating = 0
+    @State private var showPhotoGallery = false
 
     private let heroHeight: CGFloat = 360
 
     private var demoProfile: Profile? {
-        profiles.first { $0.username == session.currentUsername } ?? profiles.first
+        session.currentProfile(in: profiles)
     }
 
     private var isOwner: Bool {
@@ -60,12 +63,20 @@ struct SpotDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             logViewIfNeeded()
+            selectedRating = currentUserRating
             if FeatureFlags.publicSocialEnabled, let profile = demoProfile {
                 await socialCoordinator.bootstrapIdentity(for: profile, in: modelContext)
             }
         }
         .sheet(isPresented: $showAddToTrip) {
             AddToTripSheet(spot: spot)
+        }
+        .fullScreenCover(isPresented: $showPhotoGallery) {
+            SpotPhotoGallery(
+                photos: spot.allPhotoData,
+                category: spot.categoryEnum,
+                selectedIndex: $selectedPhotoIndex
+            )
         }
         .alert("GetOut", isPresented: Binding(
             get: { safetyMessage != nil },
@@ -81,9 +92,20 @@ struct SpotDetailView: View {
 
     private func heroSection(topInset: CGFloat) -> some View {
         ZStack(alignment: .top) {
-            SpotImage(spot: spot, startPoint: .top, endPoint: .bottom)
+            if spot.allPhotoData.count > 1 {
+                TabView(selection: $selectedPhotoIndex) {
+                    ForEach(Array(spot.allPhotoData.enumerated()), id: \.offset) { index, data in
+                        SpotImage(photoData: data, category: spot.categoryEnum, startPoint: .top, endPoint: .bottom)
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
                 .frame(height: heroHeight)
-                .clipped()
+            } else {
+                SpotImage(spot: spot, startPoint: .top, endPoint: .bottom)
+                    .frame(height: heroHeight)
+                    .clipped()
+            }
 
             VStack {
                 HStack {
@@ -115,6 +137,22 @@ struct SpotDetailView: View {
                 }
                 .padding(.horizontal, Theme.Spacing.md)
                 .padding(.top, topInset + Theme.Spacing.sm)
+
+                if spot.allPhotoData.count > 1 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                        Text("\(selectedPhotoIndex + 1) of \(spot.allPhotoData.count)")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial.opacity(0.8))
+                    .clipShape(Capsule())
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .accessibilityLabel("Photo \(selectedPhotoIndex + 1) of \(spot.allPhotoData.count). Swipe left or right for more photos.")
+                }
 
                 Spacer()
 
@@ -159,15 +197,17 @@ struct SpotDetailView: View {
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
             ratingRow
+            ratingControl
             actionRow
             publishSection
             aboutSection
+            photosSection
             tagsSection
             locationSection
             addedBySection
         }
         .padding(Theme.Spacing.md)
-        .padding(.bottom, Theme.Spacing.xl)
+        .padding(.bottom, 112)
     }
 
     private var ratingRow: some View {
@@ -175,9 +215,13 @@ struct SpotDetailView: View {
             Image(systemName: "star.fill")
                 .foregroundStyle(Color.yellow)
 
-            Text(String(format: "%.1f", spot.rating))
+            Text(spot.ratingCount == 0 ? "Not rated" : String(format: "%.1f", spot.averageRating))
                 .font(Theme.Typography.body().weight(.semibold))
                 .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+
+            Text("· \(spot.ratingCount) \(spot.ratingCount == 1 ? "review" : "reviews")")
+                .font(Theme.Typography.caption())
+                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
 
             if likeCount > 0 {
                 Text("· \(likeCount) likes")
@@ -185,6 +229,37 @@ struct SpotDetailView: View {
                     .foregroundStyle(Theme.Colors.textOnDarkSecondary)
             }
         }
+    }
+
+    private var ratingControl: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Text(selectedRating == 0 ? "Rate this spot" : "Your rating: \(selectedRating) of 5")
+                .font(Theme.Typography.caption().weight(.semibold))
+                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+
+            HStack(spacing: Theme.Spacing.sm) {
+                ForEach(1...5, id: \.self) { value in
+                    Button {
+                        setRating(value == selectedRating ? 0 : value)
+                    } label: {
+                        Image(systemName: value <= selectedRating ? "star.fill" : "star")
+                            .font(.title2)
+                            .foregroundStyle(value <= selectedRating ? Color.yellow : Theme.Colors.textOnDarkSecondary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(value) stars")
+                    .accessibilityValue(value == selectedRating ? "Selected" : "")
+                }
+            }
+
+            Text("Tap your selected star again to clear your rating (0 stars).")
+                .font(.caption2)
+                .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+        }
+        .padding(Theme.Spacing.md)
+        .background(Theme.Colors.cardSurface)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
     }
 
     private var actionRow: some View {
@@ -242,6 +317,49 @@ struct SpotDetailView: View {
                 .font(Theme.Typography.body())
                 .foregroundStyle(Theme.Colors.textOnDarkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var photosSection: some View {
+        let photos = spot.allPhotoData
+        if !photos.isEmpty {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack {
+                    SectionHeader(title: "Photos")
+                    Spacer()
+                    Text("\(photos.count)")
+                        .font(Theme.Typography.caption().weight(.semibold))
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                }
+
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.sm), count: 2),
+                    spacing: Theme.Spacing.sm
+                ) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, photoData in
+                        Button {
+                            selectedPhotoIndex = index
+                            showPhotoGallery = true
+                        } label: {
+                            SpotImage(photoData: photoData, category: spot.categoryEnum)
+                                .frame(height: 156)
+                                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
+                                .overlay(alignment: .bottomTrailing) {
+                                    Text("\(index + 1)")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                                        .padding(7)
+                                        .background(.ultraThinMaterial)
+                                        .clipShape(Circle())
+                                        .padding(8)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("View photo \(index + 1) of \(photos.count)")
+                    }
+                }
+            }
         }
     }
 
@@ -326,13 +444,6 @@ struct SpotDetailView: View {
 
                     Spacer()
 
-                    if FeatureFlags.publicSocialEnabled, !owner.cloudKitUserRecordName.isEmpty {
-                        PublicFollowButton(
-                            targetUserRecordName: owner.cloudKitUserRecordName,
-                            compact: true
-                        )
-                    }
-
                     if FeatureFlags.publicSocialEnabled,
                        !isOwner,
                        !spot.publisherUserRecordName.isEmpty {
@@ -362,6 +473,32 @@ struct SpotDetailView: View {
     }
 
     // MARK: - Actions
+
+    private var currentUserRating: Int {
+        guard let profileID = demoProfile?.id else { return 0 }
+        return spot.ratings?.first(where: { $0.user?.id == profileID })?.stars ?? 0
+    }
+
+    private func setRating(_ stars: Int) {
+        guard let profile = demoProfile, (0...5).contains(stars) else { return }
+
+        if let existing = spot.ratings?.first(where: { $0.user?.id == profile.id }) {
+            if stars == 0 {
+                modelContext.delete(existing)
+            } else {
+                existing.stars = stars
+                existing.updatedAt = .now
+            }
+        } else if stars > 0 {
+            let rating = Rating()
+            rating.stars = stars
+            rating.user = profile
+            rating.spot = spot
+            modelContext.insert(rating)
+        }
+        selectedRating = stars
+        try? modelContext.save()
+    }
 
     private func toggleLike() {
         guard let profile = demoProfile else { return }
@@ -457,6 +594,59 @@ private struct ActionPill: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct SpotPhotoGallery: View {
+    let photos: [Data]
+    let category: SpotCategory
+    @Binding var selectedIndex: Int
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
+
+            TabView(selection: $selectedIndex) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { index, photoData in
+                    SpotImage(photoData: photoData, category: category)
+                        .tag(index)
+                        .ignoresSafeArea()
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial.opacity(0.8))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close photo gallery")
+
+                Spacer()
+
+                Text("\(selectedIndex + 1) of \(photos.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.ultraThinMaterial.opacity(0.8))
+                    .clipShape(Capsule())
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, Theme.Spacing.md)
+        }
+        .accessibilityAction(.escape) {
+            dismiss()
+        }
     }
 }
 

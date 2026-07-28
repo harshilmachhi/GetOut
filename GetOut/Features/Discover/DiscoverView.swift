@@ -18,7 +18,6 @@ struct DiscoverView: View {
     @Query private var userBlocks: [UserBlock]
 
     @State private var selectedCategory: SpotCategory = .nearby
-    @State private var showMapExplore = false
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var openSearchFiltersOnAppear = false
@@ -38,7 +37,10 @@ struct DiscoverView: View {
             administrativeArea: locationManager.administrativeArea
         )
         return allSpots.filter {
-            !blocked.contains($0.publisherUserRecordName)
+            // Cloud-backed builds can retain legacy/demo/private cache rows from an older
+            // install. Only a record confirmed in the public database belongs in Discover.
+            (!FeatureFlags.cloudKitDatabaseEnabled || !$0.publicRecordName.isEmpty)
+                && !blocked.contains($0.publisherUserRecordName)
                 && (allowsCannabis || !$0.containsCannabis)
         }
     }
@@ -57,7 +59,7 @@ struct DiscoverView: View {
     }
 
     private var demoProfile: Profile? {
-        profiles.first { $0.username == session.currentUsername } ?? profiles.first
+        session.currentProfile(in: profiles)
     }
 
     var body: some View {
@@ -66,7 +68,7 @@ struct DiscoverView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HeroHeader(
                         displayName: demoProfile?.displayName ?? "Explorer",
-                        heroSpot: allSpots.first,
+                        heroSpot: visibleSpots.first,
                         topInset: geo.safeAreaInsets.top,
                         onSearchTap: {
                             openSearchFiltersOnAppear = false
@@ -98,10 +100,6 @@ struct DiscoverView: View {
                     PublicDiscoverFeedSection()
                         .padding(.top, Theme.Spacing.xl)
 
-                    ExploreMapSection(spots: candidateSpots) {
-                        showMapExplore = true
-                    }
-                    .padding(.top, Theme.Spacing.xl)
                 }
                 .padding(.bottom, 96)
             }
@@ -120,9 +118,6 @@ struct DiscoverView: View {
         }
         .navigationDestination(isPresented: $showSettings) {
             SettingsView()
-        }
-        .fullScreenCover(isPresented: $showMapExplore) {
-            MapExploreView(spots: visibleSpots)
         }
         .task {
             locationManager.requestPermission()
@@ -178,18 +173,12 @@ private struct HeroHeader: View {
     private func heroBackground(height: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             Group {
-                if let heroSpot {
+                if let heroSpot, heroSpot.photoData != nil {
                     SpotImage(spot: heroSpot, startPoint: .top, endPoint: .bottom)
                 } else {
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.98, green: 0.82, blue: 0.72),
-                            Color(red: 0.96, green: 0.90, blue: 0.78),
-                            Color(red: 0.72, green: 0.78, blue: 0.62),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                    Image("home_morning_scenic")
+                        .resizable()
+                        .scaledToFill()
                 }
             }
             .frame(height: height)
@@ -493,72 +482,6 @@ private struct SpotCard: View {
 }
 
 // MARK: - Explore Map
-
-private struct ExploreMapSection: View {
-    let spots: [Spot]
-    let onTap: () -> Void
-
-    private var mappableSpots: [Spot] {
-        spots.filter { $0.mapCoordinate != nil }
-    }
-
-    private var previewRegion: MKCoordinateRegion {
-        LocationManager.defaultRegion
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-            SectionHeader(title: "Explore the map")
-                .padding(.horizontal, Theme.Spacing.md)
-
-            Button(action: onTap) {
-                ZStack(alignment: .bottomLeading) {
-                    Map(position: .constant(.region(previewRegion))) {
-                        ForEach(mappableSpots) { spot in
-                            if let coordinate = spot.mapCoordinate {
-                                Annotation(spot.title, coordinate: coordinate) {
-                                    SpotMapPin(category: spot.categoryEnum, size: 28)
-                                }
-                            }
-                        }
-                    }
-                    .mapStyle(.standard(elevation: .flat))
-                    .allowsHitTesting(false)
-
-                    LinearGradient(
-                        colors: [.clear, Color.black.opacity(0.55)],
-                        startPoint: .center,
-                        endPoint: .bottom
-                    )
-                    .allowsHitTesting(false)
-
-                    HStack(spacing: Theme.Spacing.sm) {
-                        Text("Tap to explore")
-                            .font(Theme.Typography.body().weight(.medium))
-                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                    }
-                    .padding(Theme.Spacing.md)
-                }
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Theme.Colors.cream.opacity(0.12), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 4)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, Theme.Spacing.md)
-        }
-        .padding(.bottom, Theme.Spacing.xl)
-    }
-}
 
 // MARK: - Avatar Cluster
 

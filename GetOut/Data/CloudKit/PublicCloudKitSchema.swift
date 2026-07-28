@@ -7,7 +7,6 @@ enum PublicCloudKitSchema {
     enum RecordType {
         static let spot = "PublicSpot"
         static let userProfile = "PublicUserProfile"
-        static let follow = "PublicFollow"
         static let report = "PublicReport"
         static let usernameClaim = "PublicUsernameClaim"
     }
@@ -23,6 +22,7 @@ enum PublicCloudKitSchema {
         static let neighborhood = "neighborhood"
         static let category = "category"
         static let rating = "rating"
+        static let photo = "photo"
         static let createdAt = "createdAt"
         static let ownerUserRecordName = "ownerUserRecordName"
         static let ownerDisplayName = "ownerDisplayName"
@@ -39,12 +39,6 @@ enum PublicCloudKitSchema {
         static let displayName = "displayName"
         static let bio = "bio"
         static let avatarSystemImage = "avatarSystemImage"
-        static let createdAt = "createdAt"
-    }
-
-    enum FollowField {
-        static let followerUserRecordName = "followerUserRecordName"
-        static let followeeUserRecordName = "followeeUserRecordName"
         static let createdAt = "createdAt"
     }
 
@@ -65,11 +59,8 @@ enum PublicCloudKitSchema {
         static let createdAt = "createdAt"
     }
 
-    static func followRecordName(follower: String, followee: String) -> String {
-        "follow-\(follower)-\(followee)"
-    }
-
     static func usernameClaimRecordName(_ username: String) -> String {
         "username-\(PublicContentPolicy.normalizedUsername(username))"
     }
+
 }

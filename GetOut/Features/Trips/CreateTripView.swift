@@ -18,7 +18,7 @@ struct CreateTripView: View {
     var onCreated: ((Trip) -> Void)?
 
     private var demoProfile: Profile? {
-        allProfiles.first { $0.username == session.currentUsername } ?? allProfiles.first
+        session.currentProfile(in: allProfiles)
     }
 
     private var canSave: Bool {

@@ -25,7 +25,7 @@ struct TripDetailView: View {
     }
 
     private var currentProfile: Profile? {
-        profiles.first { $0.username == session.currentUsername } ?? profiles.first
+        session.currentProfile(in: profiles)
     }
 
     private var isTripOwner: Bool {

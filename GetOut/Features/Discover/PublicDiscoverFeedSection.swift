@@ -34,12 +34,26 @@ struct PublicDiscoverFeedSection: View {
             HStack {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     SectionHeader(title: "Community reviews")
-                    Text("Available to everyone — following is optional.")
+                    Text("Available to everyone.")
                         .font(Theme.Typography.caption())
                         .foregroundStyle(Theme.Colors.textOnDarkSecondary)
                 }
 
                 Spacer()
+
+                Button {
+                    Task { await coordinator.refreshFeed(in: modelContext) }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.Colors.accentGreen)
+                        .frame(width: 36, height: 36)
+                        .background(Theme.Colors.cardSurface)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(coordinator.isLoadingFeed)
+                .accessibilityLabel("Refresh community reviews")
 
                 if coordinator.isLoadingFeed {
                     ProgressView()
@@ -69,17 +83,6 @@ struct PublicDiscoverFeedSection: View {
                             }
                         }
                     }
-                    .padding(.horizontal, Theme.Spacing.md)
-                }
-
-                if coordinator.hasMoreFeed {
-                    Button("Load more") {
-                        Task {
-                            await coordinator.refreshFeed(in: modelContext, loadMore: true)
-                        }
-                    }
-                    .font(Theme.Typography.caption().weight(.medium))
-                    .foregroundStyle(Theme.Colors.accentGreen)
                     .padding(.horizontal, Theme.Spacing.md)
                 }
             }

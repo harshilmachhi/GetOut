@@ -1,16 +1,19 @@
 import SwiftUI
 import SwiftData
+import CloudKit
 
 private enum AppTab: CaseIterable, Hashable {
-    case discover
-    case trips
+    case home
+    case maps
     case add
+    case trips
     case profile
 
     var title: String {
         switch self {
-        case .discover: "Discover"
-        case .trips: "Trips"
+        case .home: "Home"
+        case .maps: "Maps"
+        case .trips: "Trip"
         case .add: "Add"
         case .profile: "Profile"
         }
@@ -18,7 +21,8 @@ private enum AppTab: CaseIterable, Hashable {
 
     var icon: String {
         switch self {
-        case .discover: "map"
+        case .home: "house"
+        case .maps: "map"
         case .trips: "suitcase"
         case .add: "plus.circle.fill"
         case .profile: "person.crop.circle"
@@ -29,36 +33,59 @@ private enum AppTab: CaseIterable, Hashable {
 struct RootTabView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SessionStore.self) private var session
-    @State private var selectedTab: AppTab = .discover
+    @State private var selectedTab: AppTab = .home
     @State private var socialCoordinator = PublicSocialCoordinator.shared
     @State private var tabResetID = UUID()
     @Namespace private var tabIndicator
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            tabContent
+        Group {
+            if session.isResolvingAccount {
+                VStack(spacing: Theme.Spacing.md) {
+                    ProgressView()
+                        .tint(Theme.Colors.accentGreen)
+                    Text("Connecting to iCloud…")
+                        .font(Theme.Typography.body())
+                        .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Theme.Colors.appBackground)
+            } else {
+                ZStack(alignment: .bottom) {
+                    tabContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            CustomTabBar(
-                selectedTab: $selectedTab,
-                namespace: tabIndicator,
-                onReselect: resetCurrentTab
-            )
+                    CustomTabBar(
+                        selectedTab: $selectedTab,
+                        namespace: tabIndicator,
+                        onReselect: resetCurrentTab
+                    )
+                }
+                .background(Theme.Colors.appBackground)
+            }
         }
-        .background(Theme.Colors.appBackground)
         .task {
             await socialCoordinator.restoreCurrentProfile(in: modelContext, session: session)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .CKAccountChanged)) { _ in
+            session.beginAccountResolution(clearPersistedProfile: true)
+            Task {
+                await socialCoordinator.restoreCurrentProfile(in: modelContext, session: session)
+            }
         }
     }
 
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
-        case .discover:
+        case .home:
             NavigationStack {
                 DiscoverView()
             }
             .id(tabResetID)
+        case .maps:
+            MapExploreView()
+                .id(tabResetID)
         case .trips:
             NavigationStack {
                 accountProtected { TripsView() }

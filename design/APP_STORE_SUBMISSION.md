@@ -11,7 +11,7 @@ This checklist covers the work that must be completed in Apple portals or on phy
 
 ## Suggested App Review notes
 
-> GetOut is an iPhone-only social discovery app backed by the app's CloudKit container. The public feed is readable without an account. Creating a profile, publishing a spot, following, reporting, or deleting data requires a signed-in iCloud account. The opaque app-specific CloudKit user record ID is the canonical GetOut account identifier; Sign in with Apple, phone, Google, and email/password authentication are not used.
+> GetOut is an iPhone-only social discovery app backed by the app's CloudKit container. The public feed is readable without an account. Creating a profile, publishing a spot, reporting, or deleting data requires a signed-in iCloud account. The opaque app-specific CloudKit user record ID is the canonical GetOut account identifier; Sign in with Apple, phone, Google, and email/password authentication are not used.
 >
 > Users publish spots directly. A publication confirmation explains that their profile and exact spot location become public. Users can report a spot or profile from its overflow menu, locally block a creator, unpublish their own spot, and delete their profile and GetOut data in Settings. Reports are reviewed daily at parthdhroovji1@gmail.com and in CloudKit Dashboard.
 >
@@ -31,7 +31,6 @@ Base the final answers on the shipping build and Apple's current definitions. Ex
 | User content (spot text, tags, reports) | Yes | No | App functionality, safety |
 | Photos stored with private spot data | Yes | No | App functionality |
 | Coarse/precise viewer location | Review final retention behavior | No | Nearby results and cannabis eligibility |
-| Contacts | No collection: matching remains on device | No | Do not list as collected if no contact data leaves the device |
 
 The app does not track users and does not use data for third-party advertising. Re-check the answers if analytics, crash reporting, ads, or another SDK is added. `PrivacyInfo.xcprivacy` declares the CloudKit-backed data above, no tracking, and the UserDefaults required-reason API; App Store Connect privacy answers are still a separate manual task.
 
@@ -42,14 +41,14 @@ The app does not track users and does not use data for third-party advertising. 
 - Verify public read and authenticated/creator write rules with two different iCloud accounts.
 - Promote the complete schema to Production only after the fields and indexes are final. Production schema changes are forward-only.
 - Confirm the App Store distribution profile includes the production CloudKit container and push entitlement.
-- Review `PublicReport` records every day. Process `ACCOUNT_DELETION:` cleanup requests for incoming follows promptly.
+- Review `PublicReport` records every day.
 
 ## Physical-device and TestFlight matrix
 
 - Account A and B: create distinct profiles; relaunch/reinstall and recover the correct profile from the iCloud identity.
 - Attempt the same normalized username from both accounts and verify the second creation is rejected.
-- With iCloud signed out: browse public content, then verify profile/post/follow/report actions explain that iCloud is required.
-- Publish, page, follow/unfollow, block, report, unpublish, and delete data. Confirm Account B can no longer resolve Account A after deletion.
+- With iCloud signed out: browse public content, then verify profile/post/report actions explain that iCloud is required.
+- Publish, page, block, report, unpublish, and delete data. Confirm Account B can no longer resolve Account A after deletion.
 - Turn networking off during feed and write operations; verify cached content, error copy, and successful retry.
 - Cannabis matrix: Canada, California, an ineligible jurisdiction, age declined, and location denied. Verify both feed visibility and publication.
 - Confirm exact-location disclosure appears before every public publication.

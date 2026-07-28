@@ -12,7 +12,7 @@ struct BasicDetailsView: View {
     @Binding var city: String
     @Binding var bio: String
 
-    let onContinue: () -> Void
+    let onContinue: (Profile) -> Void
 
     @FocusState private var focusedField: Field?
 
@@ -126,8 +126,8 @@ struct BasicDetailsView: View {
             city: city,
             in: modelContext
         )
-        guard profile != nil else { return }
-        username = profile?.username ?? username
-        onContinue()
+        guard let profile else { return }
+        username = profile.username
+        onContinue(profile)
     }
 }

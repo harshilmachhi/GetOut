@@ -11,8 +11,6 @@ final class Profile {
     var citiesVisited: [String] = []
     var createdAt: Date = Date.now
     var cloudKitUserRecordName: String = ""
-    var publicFollowerCount: Int = 0
-    var publicFollowingCount: Int = 0
     var preferredCategories: [String] = []
     var preferredTags: [String] = []
 
@@ -28,14 +26,11 @@ final class Profile {
     @Relationship(inverse: \Trip.owner)
     var trips: [Trip]?
 
-    @Relationship(inverse: \Follow.follower)
-    var following: [Follow]?
-
-    @Relationship(inverse: \Follow.followee)
-    var followers: [Follow]?
-
     @Relationship(inverse: \Interaction.user)
     var interactions: [Interaction]?
+
+    @Relationship(deleteRule: .cascade, inverse: \Rating.user)
+    var ratings: [Rating]?
 
     init() {}
 }
