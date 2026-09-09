@@ -136,7 +136,7 @@ struct TasteQuestionnaireView: View {
     private func saveAndFinish() {
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedUsername.isEmpty, !userRecordName.isEmpty else {
-            finishError = "Your iCloud profile was not linked correctly. Go back and try creating it again."
+            finishError = "Your GetOut profile was not linked correctly. Go back and try creating it again."
             return
         }
 
@@ -144,11 +144,17 @@ struct TasteQuestionnaireView: View {
         // best-effort private update and must not be able to trap the user in onboarding.
         if let profiles = try? modelContext.fetch(FetchDescriptor<Profile>()),
            let profile = profiles.first(where: {
-               $0.cloudKitUserRecordName == userRecordName
+               $0.supabaseUserID == userRecordName
            }) {
             profile.preferredCategories = Array(selectedCategories).sorted()
             profile.preferredTags = Array(selectedTags).sorted()
             try? modelContext.save()
+            Task {
+                _ = try? await PublicSocialCoordinator.shared.service.upsertPublicProfile(
+                    profile,
+                    userRecordName: userRecordName
+                )
+            }
         }
 
         session.completeOnboarding(

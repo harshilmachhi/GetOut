@@ -76,6 +76,7 @@ struct SpotPickerSheet: View {
         let selectedSpots = availableSpots.filter { selectedSpotIDs.contains($0.id) }
         let baseOrder = (trip.stops ?? []).map(\.order).max() ?? -1
 
+        var newStops: [TripStop] = []
         for (offset, spot) in selectedSpots.enumerated() {
             let stop = TripStop()
             stop.trip = trip
@@ -83,9 +84,13 @@ struct SpotPickerSheet: View {
             stop.dayIndex = 0
             stop.order = baseOrder + offset + 1
             modelContext.insert(stop)
+            newStops.append(stop)
         }
 
         try? modelContext.save()
+        Task {
+            for stop in newStops { try? await SupabasePrivateDataService.shared.upsertTripStop(stop) }
+        }
         dismiss()
     }
 }

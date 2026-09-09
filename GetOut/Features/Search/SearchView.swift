@@ -46,7 +46,7 @@ struct SearchView: View {
             administrativeArea: locationManager.administrativeArea
         )
         var results = allSpots.filter {
-            (!FeatureFlags.cloudKitDatabaseEnabled || !$0.publicRecordName.isEmpty)
+            !$0.publicRecordName.isEmpty
                 && !blocked.contains($0.publisherUserRecordName)
                 && (allowsCannabis || !$0.containsCannabis)
         }

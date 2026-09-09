@@ -72,7 +72,7 @@ struct PublicDiscoverFeedSection: View {
                 allowCannabis: canViewCannabisContent
             )
             if spots.isEmpty && !coordinator.isLoadingFeed {
-                PublicSocialInlineMessage(message: "No public spots yet. Publish a spot when you're signed into iCloud.")
+                PublicSocialInlineMessage(message: "No public spots yet. Publish a spot when you're signed in.")
                     .padding(.horizontal, Theme.Spacing.md)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {

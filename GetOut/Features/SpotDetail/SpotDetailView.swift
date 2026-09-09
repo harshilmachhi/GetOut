@@ -480,14 +480,18 @@ struct SpotDetailView: View {
     }
 
     private func setRating(_ stars: Int) {
-        guard let profile = demoProfile, (0...5).contains(stars) else { return }
+        guard let profile = demoProfile,
+              let userID = UUID(uuidString: profile.supabaseUserID),
+              (0...5).contains(stars) else { return }
 
+        var current: Rating?
         if let existing = spot.ratings?.first(where: { $0.user?.id == profile.id }) {
             if stars == 0 {
                 modelContext.delete(existing)
             } else {
                 existing.stars = stars
                 existing.updatedAt = .now
+                current = existing
             }
         } else if stars > 0 {
             let rating = Rating()
@@ -495,40 +499,54 @@ struct SpotDetailView: View {
             rating.user = profile
             rating.spot = spot
             modelContext.insert(rating)
+            current = rating
         }
         selectedRating = stars
         try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.setRating(current, spotID: spot.id, userID: userID) }
     }
 
     private func toggleLike() {
-        guard let profile = demoProfile else { return }
+        guard let profile = demoProfile, let userID = UUID(uuidString: profile.supabaseUserID) else { return }
 
+        let current: Like?
         if let existing = spot.likes?.first(where: { $0.user?.id == profile.id }) {
             modelContext.delete(existing)
+            current = nil
         } else {
             let like = Like()
             like.user = profile
             like.spot = spot
             modelContext.insert(like)
+            current = like
         }
+        try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.setLike(current, spotID: spot.id, userID: userID) }
     }
 
     private func toggleSave(list: String) {
-        guard let profile = demoProfile else { return }
+        guard let profile = demoProfile, let userID = UUID(uuidString: profile.supabaseUserID) else { return }
 
+        let current: Save?
         if let existing = spot.saves?.first(where: { $0.user?.id == profile.id && $0.list == list }) {
             modelContext.delete(existing)
+            current = nil
         } else {
             let save = Save()
             save.user = profile
             save.spot = spot
             save.list = list
             modelContext.insert(save)
+            current = save
         }
+        try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.setSave(current, spotID: spot.id, userID: userID, list: list) }
     }
 
     private func logViewIfNeeded() {
-        guard !didLogView, let profile = demoProfile else { return }
+        guard !didLogView,
+              let profile = demoProfile,
+              let userID = UUID(uuidString: profile.supabaseUserID) else { return }
         didLogView = true
 
         let interaction = Interaction()
@@ -537,6 +555,8 @@ struct SpotDetailView: View {
         interaction.user = profile
         interaction.contextCity = spot.city
         modelContext.insert(interaction)
+        try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.recordInteraction(interaction, userID: userID, spotID: spot.id) }
     }
 
     private func openInMaps(coordinate: CLLocationCoordinate2D) {

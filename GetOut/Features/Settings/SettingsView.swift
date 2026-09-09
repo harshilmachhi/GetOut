@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(SessionStore.self) private var session
     @State private var coordinator = PublicSocialCoordinator.shared
     @State private var showDeleteConfirmation = false
+    @State private var showSignOutConfirmation = false
     @State private var deletionMessage: String?
     @Query private var blockedUsers: [UserBlock]
     @AppStorage("privacy.hasConfirmedCannabisLegalAge") private var hasConfirmedCannabisLegalAge = false
@@ -40,13 +41,25 @@ struct SettingsView: View {
                         session: session
                     )
                     deletionMessage = deleted
-                        ? "Your GetOut profile and app data were deleted. Your Apple ID and iCloud account were not changed."
+                        ? "Your GetOut profile and app data were deleted. Your Supabase authentication record was also removed."
                         : (coordinator.accountError ?? "Your data could not be deleted.")
                 }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes your public profile, public spots, and private GetOut data. It does not delete your Apple ID or iCloud account.")
+            Text("This removes your public profile, public spots, and private GetOut data.")
+        }
+        .confirmationDialog("Sign out of GetOut?", isPresented: $showSignOutConfirmation) {
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    if !(await coordinator.signOut(in: modelContext, session: session)) {
+                        deletionMessage = coordinator.accountError ?? "You could not be signed out."
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your synced account data stays in Supabase. Cached account data is removed from this device.")
         }
         .alert("GetOut", isPresented: Binding(
             get: { deletionMessage != nil },
@@ -60,19 +73,23 @@ struct SettingsView: View {
 
     private var accountSection: some View {
         Section("Account") {
-            LabeledContent("Identity", value: "iCloud")
+            LabeledContent("Sign-in", value: "Apple or Google")
             if !session.currentUsername.isEmpty {
                 LabeledContent("GetOut profile", value: "@\(session.currentUsername)")
             }
-            if !session.currentCloudKitUserRecordName.isEmpty {
+            if !session.currentSupabaseUserID.isEmpty {
                 LabeledContent(
                     "Account code",
-                    value: String(session.currentCloudKitUserRecordName.suffix(8))
+                    value: String(session.currentSupabaseUserID.suffix(8))
                 )
             }
-            Text("Your public GetOut profile is uniquely tied to the iCloud account signed in on this device.")
+            Text("Your profile and private data are tied to your signed-in account and can be restored on another device.")
                 .font(Theme.Typography.caption())
                 .foregroundStyle(Theme.Colors.textOnDarkSecondary)
+
+            Button("Sign Out") {
+                showSignOutConfirmation = true
+            }
 
             Button("Delete Profile & GetOut Data", role: .destructive) {
                 showDeleteConfirmation = true

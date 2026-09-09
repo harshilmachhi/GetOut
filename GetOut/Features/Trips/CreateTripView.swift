@@ -176,6 +176,9 @@ struct CreateTripView: View {
 
         modelContext.insert(trip)
         try? modelContext.save()
+        if let userID = UUID(uuidString: profile.supabaseUserID) {
+            Task { try? await SupabasePrivateDataService.shared.upsertTrip(trip, userID: userID) }
+        }
 
         onCreated?(trip)
         dismiss()

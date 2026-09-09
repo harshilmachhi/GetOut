@@ -1,7 +1,6 @@
 import MapKit
 import SwiftData
 import SwiftUI
-import CloudKit
 
 struct TripDetailView: View {
     let trip: Trip
@@ -14,15 +13,6 @@ struct TripDetailView: View {
     @State private var showSpotPicker = false
     @State private var selectedSpot: Spot?
     @State private var isGeneratingPlan = false
-    @State private var showShareSheet = false
-    @State private var preparedShare: CKShare?
-    @State private var isPreparingShare = false
-    @State private var shareErrorMessage: String?
-    @State private var collaborators: [TripCollaborator] = []
-
-    private var collaborationEnabled: Bool {
-        FeatureFlags.collaborativeTripsEnabled
-    }
 
     private var currentProfile: Profile? {
         session.currentProfile(in: profiles)
@@ -73,10 +63,6 @@ struct TripDetailView: View {
 
                 actionButtons
 
-                if collaborationEnabled {
-                    collaborationSection
-                }
-
                 if !mappableStops.isEmpty {
                     tripMapSection
                 }
@@ -91,35 +77,11 @@ struct TripDetailView: View {
         }
         .background(Theme.Colors.appBackground)
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: trip.id) {
-            guard collaborationEnabled else { return }
-            collaborators = await TripSharingService.shared.collaborators(for: trip, in: modelContext)
-        }
         .navigationDestination(item: $selectedSpot) { spot in
             SpotDetailView(spot: spot)
         }
         .sheet(isPresented: $showSpotPicker) {
             SpotPickerSheet(trip: trip)
-        }
-        .sheet(isPresented: $showShareSheet, onDismiss: {
-            preparedShare = nil
-            Task {
-                collaborators = await TripSharingService.shared.collaborators(for: trip, in: modelContext)
-            }
-        }) {
-            if let preparedShare {
-                TripSharingController(share: preparedShare) {
-                    showShareSheet = false
-                }
-            }
-        }
-        .alert("Couldn’t share trip", isPresented: Binding(
-            get: { shareErrorMessage != nil },
-            set: { if !$0 { shareErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(shareErrorMessage ?? "")
         }
     }
 
@@ -195,25 +157,6 @@ struct TripDetailView: View {
                 .disabled(stops.isEmpty || isGeneratingPlan)
             }
 
-            if collaborationEnabled && isTripOwner {
-                Button {
-                    Task { await presentShareSheet() }
-                } label: {
-                    Label(isPreparingShare ? "Preparing invite…" : "Share trip", systemImage: "person.badge.plus")
-                        .font(Theme.Typography.body().weight(.medium))
-                        .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .background(Theme.Colors.accentGreen.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: Theme.Radius.control)
-                                .stroke(Theme.Colors.accentGreen.opacity(0.35), lineWidth: 1)
-                        }
-                }
-                .buttonStyle(.plain)
-                .disabled(isPreparingShare)
-            }
         }
         .padding(.horizontal, Theme.Spacing.md)
     }
@@ -244,54 +187,6 @@ struct TripDetailView: View {
                 .stroke(Theme.Colors.accentGreen.opacity(0.25), lineWidth: 1)
         }
         .padding(.horizontal, Theme.Spacing.md)
-    }
-
-    @ViewBuilder
-    private var collaborationSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            SectionHeader(title: "Collaborators")
-                .padding(.horizontal, Theme.Spacing.md)
-
-            if collaborators.isEmpty {
-                Text(isTripOwner
-                     ? "Invite friends to view and edit this trip together."
-                     : "No collaborators yet.")
-                    .font(Theme.Typography.body())
-                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
-                    .padding(.horizontal, Theme.Spacing.md)
-            } else {
-                VStack(spacing: Theme.Spacing.sm) {
-                    ForEach(collaborators) { collaborator in
-                        HStack(spacing: Theme.Spacing.md) {
-                            Image(systemName: collaborator.isOwner ? "crown.fill" : "person.crop.circle")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(
-                                    collaborator.isOwner
-                                        ? Theme.Colors.accentGreen
-                                        : Theme.Colors.textOnDarkSecondary
-                                )
-                                .frame(width: 28)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(collaborator.displayName)
-                                    .font(Theme.Typography.body().weight(.medium))
-                                    .foregroundStyle(Theme.Colors.textOnDarkPrimary)
-
-                                Text(collaborator.statusLabel)
-                                    .font(Theme.Typography.caption())
-                                    .foregroundStyle(Theme.Colors.textOnDarkSecondary)
-                            }
-
-                            Spacer()
-                        }
-                        .padding(Theme.Spacing.md)
-                        .background(Theme.Colors.cardSurface)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
-                    }
-                }
-                .padding(.horizontal, Theme.Spacing.md)
-            }
-        }
     }
 
     @ViewBuilder
@@ -398,6 +293,12 @@ struct TripDetailView: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             TripPlanner.generatePlan(for: trip, in: modelContext)
         }
+        if let userID = UUID(uuidString: currentProfile?.supabaseUserID ?? "") {
+            Task {
+                try? await SupabasePrivateDataService.shared.upsertTrip(trip, userID: userID)
+                for stop in stops { try? await SupabasePrivateDataService.shared.upsertTripStop(stop) }
+            }
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             isGeneratingPlan = false
@@ -405,8 +306,10 @@ struct TripDetailView: View {
     }
 
     private func removeStop(_ stop: TripStop) {
+        let id = stop.id
         modelContext.delete(stop)
         try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.deleteTripStop(id: id) }
     }
 
     private func moveStop(_ stop: TripStop, toDay dayIndex: Int) {
@@ -414,23 +317,9 @@ struct TripDetailView: View {
         stop.dayIndex = dayIndex
         stop.order = (dayStops.map(\.order).max() ?? -1) + 1
         try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.upsertTripStop(stop) }
     }
 
-    private func presentShareSheet() async {
-        guard collaborationEnabled, isTripOwner else { return }
-
-        isPreparingShare = true
-        shareErrorMessage = nil
-        defer { isPreparingShare = false }
-
-        do {
-            let share = try await TripSharingService.shared.prepareShare(for: trip, in: modelContext)
-            preparedShare = share
-            showShareSheet = true
-        } catch {
-            shareErrorMessage = error.localizedDescription
-        }
-    }
 }
 
 private struct TripStopRow: View {

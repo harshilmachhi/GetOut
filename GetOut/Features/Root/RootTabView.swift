@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import CloudKit
 
 private enum AppTab: CaseIterable, Hashable {
     case home
@@ -44,7 +43,7 @@ struct RootTabView: View {
                 VStack(spacing: Theme.Spacing.md) {
                     ProgressView()
                         .tint(Theme.Colors.accentGreen)
-                    Text("Connecting to iCloud…")
+                    Text("Connecting to GetOut…")
                         .font(Theme.Typography.body())
                         .foregroundStyle(Theme.Colors.textOnDarkSecondary)
                 }
@@ -66,12 +65,10 @@ struct RootTabView: View {
         }
         .task {
             await socialCoordinator.restoreCurrentProfile(in: modelContext, session: session)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .CKAccountChanged)) { _ in
-            session.beginAccountResolution(clearPersistedProfile: true)
-            Task {
-                await socialCoordinator.restoreCurrentProfile(in: modelContext, session: session)
-            }
+            guard session.hasCompletedOnboarding,
+                  let profile = session.currentProfile(in: (try? modelContext.fetch(FetchDescriptor<Profile>())) ?? []) else { return }
+            await socialCoordinator.refreshFeed(in: modelContext)
+            try? await SupabasePrivateDataService.shared.pullRemoteState(in: modelContext, profile: profile)
         }
     }
 

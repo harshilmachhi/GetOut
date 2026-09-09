@@ -1,0 +1,8 @@
+{
+  "name": "expo-place-search",
+  "version": "1.0.0",
+  "description": "GetOut native Apple Maps place search",
+  "main": "index.js",
+  "license": "MIT",
+  "peerDependencies": {"expo": "*", "react-native": "*"}
+}

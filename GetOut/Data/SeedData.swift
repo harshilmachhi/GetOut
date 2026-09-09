@@ -33,8 +33,6 @@ enum SeedData {
     }
 
     static func seedIfNeeded(in context: ModelContext) {
-        guard !FeatureFlags.cloudKitDatabaseEnabled else { return }
-
         var descriptor = FetchDescriptor<Spot>()
         descriptor.fetchLimit = 1
         guard (try? context.fetch(descriptor).isEmpty) == true else {
@@ -95,8 +93,6 @@ enum SeedData {
     }
 
     static func seedDemoFriendsIfNeeded(in context: ModelContext) {
-        guard !FeatureFlags.cloudKitDatabaseEnabled else { return }
-
         var existingDescriptor = FetchDescriptor<Profile>(
             predicate: #Predicate { $0.username == "maya" }
         )

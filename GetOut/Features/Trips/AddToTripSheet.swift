@@ -99,6 +99,7 @@ struct AddToTripSheet: View {
         stop.order = baseOrder + 1
         modelContext.insert(stop)
         try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.upsertTripStop(stop) }
         dismiss()
     }
 }

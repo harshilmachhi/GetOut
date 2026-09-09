@@ -11,13 +11,13 @@ This checklist covers the work that must be completed in Apple portals or on phy
 
 ## Suggested App Review notes
 
-> GetOut is an iPhone-only social discovery app backed by the app's CloudKit container. The public feed is readable without an account. Creating a profile, publishing a spot, reporting, or deleting data requires a signed-in iCloud account. The opaque app-specific CloudKit user record ID is the canonical GetOut account identifier; Sign in with Apple, phone, Google, and email/password authentication are not used.
+> GetOut is an iPhone-only social discovery app backed by Supabase. Users create an account with Sign in with Apple or Continue with Google before creating a public profile.
 >
-> Users publish spots directly. A publication confirmation explains that their profile and exact spot location become public. Users can report a spot or profile from its overflow menu, locally block a creator, unpublish their own spot, and delete their profile and GetOut data in Settings. Reports are reviewed daily at parthdhroovji1@gmail.com and in CloudKit Dashboard.
+> Users publish spots directly. A publication confirmation explains that their profile and exact spot location become public. Users can report a spot or profile from its overflow menu, block a creator, unpublish their own spot, and delete their profile, content, and authentication record in Settings. Reports are reviewed daily at parthdhroovji1@gmail.com and in Supabase.
 >
 > Cannabis-related content is informational only and does not offer sales, ordering, or delivery. It is hidden unless the user privately confirms legal age and the device is in Canada or California. Publishing a cannabis-tagged spot also requires reverse-geocoded spot coordinates in Canada or California. Location denial and age decline keep this content hidden.
 
-Tell App Review which test iCloud account/profile to use if the reviewer needs to exercise write features. Never include a real Apple ID password in Review Notes; use Apple's supported demo-account process if one is requested.
+Provide App Review with a working Google test account, or explain that reviewers can use Sign in with Apple with their sandbox Apple ID. Do not provide a personal production account.
 
 ## App Privacy answers to verify in App Store Connect
 
@@ -25,34 +25,34 @@ Base the final answers on the shipping build and Apple's current definitions. Ex
 
 | Data type | Linked to user | Tracking | Purpose |
 | --- | --- | --- | --- |
-| User ID (opaque CloudKit record ID) | Yes | No | App functionality, account and abuse prevention |
+| User ID (opaque Supabase Auth UUID) | Yes | No | App functionality, account and abuse prevention |
 | Name / username / profile bio | Yes | No | App functionality |
 | Precise location of published spots | Yes | No | App functionality |
 | User content (spot text, tags, reports) | Yes | No | App functionality, safety |
 | Photos stored with private spot data | Yes | No | App functionality |
 | Coarse/precise viewer location | Review final retention behavior | No | Nearby results and cannabis eligibility |
 
-The app does not track users and does not use data for third-party advertising. Re-check the answers if analytics, crash reporting, ads, or another SDK is added. `PrivacyInfo.xcprivacy` declares the CloudKit-backed data above, no tracking, and the UserDefaults required-reason API; App Store Connect privacy answers are still a separate manual task.
+The app does not track users and does not use data for third-party advertising. Re-check the answers if analytics, crash reporting, ads, or another SDK is added. `PrivacyInfo.xcprivacy` declares the Supabase-backed data above, no tracking, and the UserDefaults required-reason API; App Store Connect privacy answers are still a separate manual task.
 
-## CloudKit release gate
+## Supabase release gate
 
-- Create the public record types, fields, indexes, and security roles in `CLOUDKIT_SETUP.md` in the Development environment.
-- Exercise every record type from a development build so CloudKit discovers the private SwiftData schema.
-- Verify public read and authenticated/creator write rules with two different iCloud accounts.
-- Promote the complete schema to Production only after the fields and indexes are final. Production schema changes are forward-only.
-- Confirm the App Store distribution profile includes the production CloudKit container and push entitlement.
+- Apply every migration in `supabase/migrations` and confirm `supabase migration list` has no drift.
+- Keep anonymous sign-ins disabled. Enable Apple and Google and verify public read plus authenticated/owner write RLS with two users.
+- Confirm no secret/service-role key is embedded in the app.
+- Confirm the App Store target includes only the capabilities actually used, including Sign in with Apple.
 - Review `PublicReport` records every day.
 
 ## Physical-device and TestFlight matrix
 
-- Account A and B: create distinct profiles; relaunch/reinstall and recover the correct profile from the iCloud identity.
+- Account A and B: create distinct profiles and relaunch to recover the correct profile from each persisted Supabase session.
 - Attempt the same normalized username from both accounts and verify the second creation is rejected.
-- With iCloud signed out: browse public content, then verify profile/post/report actions explain that iCloud is required.
+- With a fresh install: verify Apple and Google login, account cancellation/error handling, and onboarding.
+- Sign out and sign back in with each provider; verify the correct profile and private data are restored.
 - Publish, page, block, report, unpublish, and delete data. Confirm Account B can no longer resolve Account A after deletion.
 - Turn networking off during feed and write operations; verify cached content, error copy, and successful retry.
 - Cannabis matrix: Canada, California, an ineligible jurisdiction, age declined, and location denied. Verify both feed visibility and publication.
 - Confirm exact-location disclosure appears before every public publication.
-- Confirm reports appear in Production CloudKit Dashboard and the support email is reachable.
+- Confirm reports appear in Supabase and the support email is reachable.
 - Run a full TestFlight pass using the Production schema before review.
 
 ## Listing and archive gate

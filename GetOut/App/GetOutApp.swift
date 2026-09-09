@@ -3,16 +3,12 @@ import SwiftData
 
 @main
 struct GetOutApp: App {
-    @UIApplicationDelegateAdaptor(CloudKitShareAcceptanceDelegate.self)
-    private var cloudKitShareAcceptanceDelegate
-
     @State private var session = SessionStore()
 
     let container: ModelContainer
 
     init() {
         container = Self.makeContainer()
-        SwiftDataCloudKitBridge.register(modelContainer: container)
     }
 
     var body: some Scene {
@@ -23,12 +19,8 @@ struct GetOutApp: App {
             .environment(session)
             .preferredColorScheme(.dark)
             .tint(Theme.Colors.accentGreen)
-            .cloudKitRemoteChangeHandlingEnabled()
             .task {
                 SeedData.seedTaxonomyIfNeeded(in: container.mainContext)
-#if DEBUG
-                SeedData.seedIfNeeded(in: container.mainContext)
-#endif
             }
         }
         .modelContainer(container)
@@ -49,15 +41,8 @@ struct GetOutApp: App {
         ])
 
         do {
-            let configuration: ModelConfiguration
-            if FeatureFlags.cloudKitDatabaseEnabled {
-                configuration = ModelConfiguration(
-                    schema: schema,
-                    cloudKitDatabase: .private("iCloud.com.parth.getout")
-                )
-            } else {
-                configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            }
+            // SwiftData is an offline cache. Supabase is the sole remote source of truth.
+            let configuration = ModelConfiguration("GetOutSupabase", schema: schema, isStoredInMemoryOnly: false)
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             let fallback = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)

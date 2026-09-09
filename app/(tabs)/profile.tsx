@@ -1,0 +1,26 @@
+import {Ionicons} from '@expo/vector-icons';
+import {router} from 'expo-router';
+import React, {useMemo, useState} from 'react';
+import {Alert, ImageBackground, Pressable, StyleSheet, Text, View} from 'react-native';
+import {AccountGate} from '@/components/AuthFlow';
+import {spotImage} from '@/components/SpotCard';
+import {Card, Muted, Screen, Title} from '@/components/ui';
+import {useApp} from '@/store/AppContext';
+import type {Spot} from '@/types';
+import {colors, radius, spacing} from '@/theme';
+
+type Segment = 'Loved'|'Created'|'Been'|'Cities';
+export default function ProfileScreen(){return <AccountGate><ProfileContent/></AccountGate>}
+function ProfileContent(){
+  const app=useApp(); const [segment,setSegment]=useState<Segment>('Loved'); const profile=app.profile!;
+  const owned=app.spots.filter(s=>s.owner_id===profile.id); const loved=app.spots.filter(s=>app.likes.some(x=>x.spot_id===s.id)); const been=app.spots.filter(s=>app.saves.some(x=>x.spot_id===s.id&&x.list==='beenThere'));
+  const cities=useMemo(()=>Object.entries([...owned,...loved,...been].reduce<Record<string,Spot[]>>((a,s)=>{const key=s.city||'Unknown city';if(!a[key])a[key]=[];if(!a[key].some(v=>v.id===s.id))a[key].push(s);return a},{})),[owned,loved,been]);
+  const current=segment==='Loved'?loved:segment==='Created'?owned:been;
+  return <Screen><Title>Profile</Title><Card style={styles.header}><View style={styles.avatar}><Ionicons name="person" size={38} color={colors.muted}/></View><Text style={styles.name}>{profile.display_name}</Text><Muted>@{profile.username}</Muted>{!!profile.bio&&<Muted style={styles.center}>{profile.bio}</Muted>}<Text style={styles.stat}>{owned.length}</Text><Muted>Spots</Muted></Card>
+    <View style={styles.manage}><Pressable onPress={()=>router.push('/settings')} style={styles.manageButton}><Ionicons name="settings-outline" size={18} color={colors.text}/><Text style={styles.manageText}>Settings</Text></Pressable><Pressable onPress={()=>router.push('/settings')} style={styles.manageButton}><Ionicons name="hand-left" size={18} color={colors.text}/><Text style={styles.manageText}>Blocked people {app.blocks.length?`· ${app.blocks.length}`:''}</Text></Pressable></View>
+    <View style={styles.segments}>{(['Loved','Created','Been','Cities'] as Segment[]).map(s=><Pressable key={s} onPress={()=>setSegment(s)} style={[styles.segment,segment===s&&styles.segmentActive]}><Text style={[styles.segmentText,segment===s&&styles.segmentTextActive]}>{s}</Text></Pressable>)}</View>
+    {segment==='Cities'?cities.map(([city,spots])=><Card key={city} style={styles.city}><ImageBackground source={spotImage(spots[0])} style={styles.cityImage}/><View><Text style={styles.tileTitle}>{city}</Text><Muted>{spots.length} spot{spots.length===1?'':'s'}</Muted></View></Card>):<View style={styles.grid}>{current.map(spot=><Pressable key={spot.id} onPress={()=>router.push(`/spot/${spot.id}`)} style={styles.tile}><ImageBackground source={spotImage(spot)} style={styles.tileImage} imageStyle={{borderRadius:radius.control}}><View style={styles.tileShade}/><Text style={styles.tileTitle}>{spot.title}</Text>{segment==='Created'&&<Pressable onPress={()=>Alert.alert(`Delete ${spot.title}?`,'This permanently removes the public spot.',[{text:'Cancel'},{text:'Delete',style:'destructive',onPress:()=>app.deleteSpot(spot.id)}])} style={styles.trash}><Ionicons name="trash" size={16} color={colors.text}/></Pressable>}</ImageBackground></Pressable>)}</View>}
+    {segment!=='Cities'&&!current.length&&<Muted style={styles.center}>Nothing here yet. Go discover a place worth remembering.</Muted>}
+  </Screen>
+}
+const styles=StyleSheet.create({header:{alignItems:'center',padding:spacing.lg,gap:5},avatar:{width:88,height:88,borderRadius:44,backgroundColor:colors.surface2,alignItems:'center',justifyContent:'center'},name:{fontFamily:'serif',fontWeight:'700',fontSize:24,color:colors.text,marginTop:8},center:{textAlign:'center'},stat:{fontSize:22,fontWeight:'800',color:colors.text,marginTop:10},manage:{flexDirection:'row',gap:spacing.sm},manageButton:{flex:1,padding:spacing.md,backgroundColor:colors.surface,borderWidth:StyleSheet.hairlineWidth,borderColor:colors.border,borderRadius:radius.control,flexDirection:'row',alignItems:'center',gap:6},manageText:{color:colors.text,fontSize:12,fontWeight:'700'},segments:{flexDirection:'row',padding:3,backgroundColor:colors.surface,borderRadius:10,borderWidth:StyleSheet.hairlineWidth,borderColor:colors.border},segment:{flex:1,alignItems:'center',paddingVertical:7,borderRadius:8},segmentActive:{backgroundColor:colors.surfaceElevated},segmentText:{color:colors.muted,fontSize:12,fontWeight:'600'},segmentTextActive:{color:colors.text,fontWeight:'700'},grid:{flexDirection:'row',flexWrap:'wrap',gap:spacing.sm},tile:{width:'48.5%'},tileImage:{height:130,justifyContent:'flex-end',padding:spacing.sm},tileShade:{...StyleSheet.absoluteFill,backgroundColor:'rgba(0,0,0,.35)',borderRadius:radius.control},tileTitle:{color:colors.text,fontWeight:'800'},trash:{position:'absolute',right:8,top:8,width:32,height:32,borderRadius:16,backgroundColor:'rgba(0,0,0,.65)',alignItems:'center',justifyContent:'center'},city:{flexDirection:'row',alignItems:'center',padding:spacing.sm,gap:spacing.md},cityImage:{width:58,height:58,borderRadius:radius.control,overflow:'hidden'}});

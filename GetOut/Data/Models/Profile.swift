@@ -10,7 +10,7 @@ final class Profile {
     var avatarSystemImage: String = "person.fill"
     var citiesVisited: [String] = []
     var createdAt: Date = Date.now
-    var cloudKitUserRecordName: String = ""
+    var supabaseUserID: String = ""
     var preferredCategories: [String] = []
     var preferredTags: [String] = []
 

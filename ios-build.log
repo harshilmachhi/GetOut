@@ -1,0 +1,727 @@
+2026-09-09T05:56:15.749Z expo:telemetry Switching strategy from detached to instant
+2026-09-09T05:56:15.751Z expo:telemetry Recording 1 event(s)
+2026-09-09T05:56:16.265Z expo:env /Users/parth/Code/GetOut/GetOut/.env does not exist, skipping this env file
+2026-09-09T05:56:16.265Z expo:env /Users/parth/Code/GetOut/GetOut/.env.development does not exist, skipping this env file
+2026-09-09T05:56:16.265Z expo:env /Users/parth/Code/GetOut/GetOut/.env.local does not exist, skipping this env file
+2026-09-09T05:56:16.265Z expo:env /Users/parth/Code/GetOut/GetOut/.env.development.local does not exist, skipping this env file
+Resolved port: 8081, start dev server: true
+2026-09-09T05:56:17.947Z expo:doctor:apple:xcode Xcode version: 26.3.0
+2026-09-09T05:56:18.228Z expo:doctor:apple:simulatorApp Xcode simulator app id: com.apple.iphonesimulator
+2026-09-09T05:56:18.760Z expo:start:platforms:ios:xcrun Running: xcrun devicectl list devices --json-output /var/folders/70/66qb5vv118gdtssx500667y40000gn/T/ceeb1bedc3a2e64782fa6c254284f2ec --timeout 5
+2026-09-09T05:56:18.764Z expo:apple-device:client:usbmuxd connectUsbmuxdSocket
+2026-09-09T05:56:18.765Z expo:apple-device:client:usbmuxd getDevices
+2026-09-09T05:56:18.766Z expo:apple-device:protocol:usbmux socket write: {"messageType":"ListDevices"}
+2026-09-09T05:56:18.785Z expo:start:platforms:ios:xcrun Running: xcrun simctl list devices --json 
+2026-09-09T05:56:18.791Z expo:apple-device:protocol:usbmux Response: {"DeviceList":[]}
+2026-09-09T05:56:19.103Z expo:devicectl Name             Hostname                          Identifier                             State                Model                     
+--------------   -------------------------------   ------------------------------------   ------------------   --------------------------
+Crow             Crow.coredevice.local             01926E41-6447-5CA3-8C70-EC47A030D4B3   available (paired)   iPhone 15 Pro (iPhone16,1)
+RakeshDhroovji   RakeshDhroovji.coredevice.local   BA7C922E-FA9A-5125-A5E5-C4CEFDBB74A9   unavailable          iPhone17,3                
+
+2026-09-09T05:56:19.183Z expo:start:platforms:ios:xcrun Running: xcrun simctl list devices --json 
+2026-09-09T05:56:19.459Z expo:start:platforms:ios:getBestSimulator First booted simulator: iPhone 16e (26.2)
+› Using --device 00008130-000978803CDA001C
+› Auto signing app using team(s): 3W3G74V42R
+Failed to remove extended attribute com.apple.FinderInfo (this is usually fine)
+Failed to remove extended attribute com.apple.provenance (this is usually fine)
+  xcodebuild -workspace /Users/parth/Code/GetOut/GetOut/ios/GetOut.xcworkspace -configuration Debug -scheme GetOut -destination id=00008130-000978803CDA001C COCOAPODS_PARALLEL_CODE_SIGN=true COMPILER_INDEX_STORE_ENABLE=NO
+› Planning build
+⚠️  Script has ambiguous dependencies causing it to run on every build.
+   To fix, go to: Xcode » Pods/hermes-engine » Build Phases » '[CP-User] [Hermes] Replace Hermes for the right configuration, if needed'
+   Either: Uncheck "Based on dependency analysis", or select output files to trigger the script
+
+› Executing react-native Pods/hermes-engine » [CP-User] [Hermes] Replace Hermes for the right configuration, if needed
+› Executing react-native Pods/ReactNativeDependencies » [CP-User] [RNDeps] Replace React Native Dependencies for the right configuration, if needed
+› Preparing Pods/React-timing-React-timing_privacy » ResourceBundle-React-timing_privacy-React-timing-Info.plist
+› Copying   React-timing/React-timing_privacy.bundle/PrivacyInfo.xcprivacy ➜ node_modules/react-native/ReactCommon/react/timing/PrivacyInfo.xcprivacy
+› Preparing Pods/React-cxxreact-React-cxxreact_privacy » ResourceBundle-React-cxxreact_privacy-React-cxxreact-Info.plist
+› Copying   React-cxxreact/React-cxxreact_privacy.bundle/PrivacyInfo.xcprivacy ➜ node_modules/react-native/ReactCommon/cxxreact/PrivacyInfo.xcprivacy
+› Creating  Pods/React-timing-React-timing_privacy » React-timing_privacy.bundle
+› Creating  Pods/React-cxxreact-React-cxxreact_privacy » React-cxxreact_privacy.bundle
+› Preparing Pods/React-Core-React-Core_privacy » ResourceBundle-React-Core_privacy-React-Core-Info.plist
+› Copying   React-Core/React-Core_privacy.bundle/PrivacyInfo.xcprivacy ➜ node_modules/react-native/React/Resources/PrivacyInfo.xcprivacy
+› Preparing Pods/RNCAsyncStorage-RNCAsyncStorage_resources » ResourceBundle-RNCAsyncStorage_resources-RNCAsyncStorage-Info.plist
+› Copying   RNCAsyncStorage/RNCAsyncStorage_resources.bundle/PrivacyInfo.xcprivacy ➜ node_modules/@react-native-async-storage/async-storage/ios/PrivacyInfo.xcprivacy
+› Creating  Pods/React-Core-React-Core_privacy » React-Core_privacy.bundle
+› Creating  Pods/RNCAsyncStorage-RNCAsyncStorage_resources » RNCAsyncStorage_resources.bundle
+› Preparing Pods/ExpoFileSystem-ExpoFileSystem_privacy » ResourceBundle-ExpoFileSystem_privacy-ExpoFileSystem-Info.plist
+› Preparing Pods/EXConstants-ExpoConstants_privacy » ResourceBundle-ExpoConstants_privacy-EXConstants-Info.plist
+› Copying   EXConstants/ExpoConstants_privacy.bundle/PrivacyInfo.xcprivacy ➜ node_modules/expo-constants/ios/PrivacyInfo.xcprivacy
+› Preparing expo-constants Pods/EXConstants-EXConstants » ResourceBundle-EXConstants-EXConstants-Info.plist
+› Creating  Pods/ExpoFileSystem-ExpoFileSystem_privacy » ExpoFileSystem_privacy.bundle
+› Creating  Pods/EXConstants-ExpoConstants_privacy » ExpoConstants_privacy.bundle
+› Creating  expo-constants Pods/EXConstants-EXConstants » EXConstants.bundle
+› Executing react-native Pods/ReactNativeDependencies » [CP] Copy XCFrameworks
+› Executing react-native Pods/hermes-engine » [CP] Copy XCFrameworks
+› Executing react-native Pods/React-Core-prebuilt » [CP-User] [RNCore] Replace React Native Core for the right configuration, if needed
+› Executing react-native Pods/React-Core-prebuilt » [CP] Copy XCFrameworks
+› Executing expo-modules-jsi Pods/ExpoModulesJSI » [CP-User] Build ExpoModulesJSI xcframework
+
+⚠️  (ios/Pods/Headers/Public/React-jsi/jsi/jsi.h:2267:1)
+
+/Users/parth/Code/GetOut/GetOut/node_modules/expo-modules-jsi/apple/Sources/Expo...
+^ umbrella header for module 'jsi' does not include header 'JSIDynamic.h'
+(warning truncated)
+
+⚠️  (ios/Pods/Headers/Public/React-jsi/jsi/jsi.h:2267:1)
+
+/Users/parth/Code/GetOut/GetOut/node_modules/expo-modules-jsi/apple/Sources/Expo...
+^ umbrella header for module 'jsi' does not include header 'hermes-interfaces.h'
+(warning truncated)
+
+⚠️  (ios/Pods/Headers/Public/React-jsi/jsi/jsi.h:2267:1)
+
+/Users/parth/Code/GetOut/GetOut/node_modules/expo-modules-jsi/apple/Sources/Expo...
+^ umbrella header for module 'jsi' does not include header 'decorator.h'
+(warning truncated)
+
+⚠️  (ios/Pods/Headers/Public/React-jsi/jsi/jsi.h:2267:1)
+
+/Users/parth/Code/GetOut/GetOut/node_modules/expo-modules-jsi/apple/Sources/Expo...
+^ umbrella header for module 'jsi' does not include header 'threadsafe.h'
+(warning truncated)
+⚠️  umbrella header for module 'jsi' does not include header 'jsilib.h'
+   └─/Users/parth/Code/GetOut/GetOut/ios/Pods/Headers/Public/React-jsi/jsi/jsi.h:2267:1
+
+❌  (node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h:53:26)
+
+  51 |    the real react::RuntimeScheduler.
+  52 |    */
+> 53 |   SWIFT_RETURNS_RETAINED RuntimeScheduler(void *scheduler, ScheduleFn fn) noexcept
+     |                          ^ 'RuntimeScheduler' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type
+  54 |       : nativeScheduler(scheduler), scheduleFn(fn) {}
+  55 |
+  56 |   /**
+
+
+❌  (node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h:61:26)
+
+  59 |    no React scheduler.
+  60 |    */
+> 61 |   SWIFT_RETURNS_RETAINED RuntimeScheduler() {}
+     |                          ^ 'RuntimeScheduler' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type
+  62 |
+  63 |   RuntimeScheduler(const RuntimeScheduler &) = delete;
+  64 |
+
+› Executing react-native Pods/React-RCTFBReactNativeSpec » [CP-User] [RN]Check FBReactNativeSpec
+› Executing getout Pods/ReactCodegen » [CP-User] Generate Specs
+› Compiling @expo/log-box Pods/ExpoLogBox » ExpoRedBoxSwap.mm
+› Executing getout Pods/ReactCodegen » [Expo] Remove duplicate codegen output
+› Compiling getout Pods/ReactCodegen » rnworklets-generated.mm
+› Compiling getout Pods/ReactCodegen » safeareacontext-generated.mm
+› Compiling getout Pods/ReactCodegen » rnscreens-generated.mm
+› Compiling getout Pods/ReactCodegen » rnreanimated-generated.mm
+› Compiling getout Pods/ReactCodegen » rngesturehandler_codegen-generated.mm
+› Compiling getout Pods/ReactCodegen » rnasyncstorage-generated.mm
+› Compiling getout Pods/ReactCodegen » States.cpp
+› Compiling getout Pods/ReactCodegen » States.cpp
+› Compiling getout Pods/ReactCodegen » States.cpp
+› Compiling getout Pods/ReactCodegen » States.cpp
+› Compiling getout Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling getout Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling getout Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling getout Pods/ReactCodegen » ShadowNodes.cpp
+› Compiling getout Pods/ReactCodegen » RCTUnstableModulesRequiringMainQueueSetupProvider.mm
+› Compiling getout Pods/ReactCodegen » RCTThirdPartyComponentsProvider.mm
+› Compiling getout Pods/ReactCodegen » RCTModulesConformingToProtocolsProvider.mm
+› Compiling getout Pods/ReactCodegen » RCTModuleProviders.mm
+› Compiling getout Pods/ReactCodegen » Props.cpp
+› Compiling getout Pods/ReactCodegen » Props.cpp
+› Compiling getout Pods/ReactCodegen » Props.cpp
+› Compiling getout Pods/ReactCodegen » Props.cpp
+› Compiling getout Pods/ReactCodegen » EventEmitters.cpp
+› Compiling getout Pods/ReactCodegen » EventEmitters.cpp
+› Compiling getout Pods/ReactCodegen » EventEmitters.cpp
+› Compiling getout Pods/ReactCodegen » EventEmitters.cpp
+› Compiling getout Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling getout Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling getout Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling getout Pods/ReactCodegen » ComponentDescriptors.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewState.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewShadowNode.cpp
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaViewComponentView.mm
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaProviderComponentView.mm
+› Compiling react-native-safe-area-context Pods/react-native-safe-area-context » RNCSafeAreaContext.mm
+› Compiling @expo/log-box Pods/ExpoLogBox » ExpoLogBox-dummy.m
+› Packaging @expo/log-box Pods/ExpoLogBox » libExpoLogBox.a
+› Executing @expo/log-box Pods/ExpoLogBox » Copy generated compatibility header
+› Compiling getout Pods/ReactAppDependencyProvider » RCTAppDependencyProvider.mm
+› Compiling react-native-worklets Pods/RNWorklets » WorkletsVersion.cpp
+› Compiling react-native-worklets Pods/RNWorklets » WorkletsNetworking.mm
+› Compiling react-native-worklets Pods/RNWorklets » WorkletsModuleProxy.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » WorkletsModule.mm
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » WorkletsJSIUtils.cpp
+› Compiling react-native-worklets Pods/RNWorklets » WorkletRuntimeRegistry.cpp
+› Compiling react-native-worklets Pods/RNWorklets » WorkletRuntimeDecorator.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » WorkletRuntime.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » WorkletHermesRuntime.cpp
+› Compiling react-native-worklets Pods/RNWorklets » WorkletEventHandler.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » VersionUtils.cpp
+› Compiling react-native-worklets Pods/RNWorklets » UIScheduler.cpp
+› Compiling react-native-worklets Pods/RNWorklets » UIRuntimeDecorator.cpp
+› Compiling react-native-worklets Pods/RNWorklets » SynchronizableAccess.cpp
+› Compiling react-native-worklets Pods/RNWorklets » Synchronizable.cpp
+› Compiling react-native-worklets Pods/RNWorklets » StableApi.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » SlowAnimations.mm
+› Compiling react-native-worklets Pods/RNWorklets » Shareable.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » SerializableRemoteFunction.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » SerializableFactory.cpp
+› Compiling react-native-worklets Pods/RNWorklets » Serializable.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:175:8)
+
+  173 |   /* #region deprecated */
+  174 |
+> 175 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  176 |   template <typename... Args>
+  177 |   jsi::Value runGuarded(const std::shared_ptr<SerializableWorklet> &worklet, Args &&...args) const {
+  178 |     return runSync(worklet, std::forward<Args>(args)...);
+
+› Compiling react-native-worklets Pods/RNWorklets » RuntimeManager.cpp
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:181:8)
+
+  179 |   }
+  180 |
+> 181 |   /** @deprecated Use `schedule` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+  184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:184:8)
+
+  182 |   void runAsyncGuarded(const std::shared_ptr<SerializableWorklet> &worklet);
+  183 |
+> 184 |   /** @deprecated Use `runSyncSerialized` and extract to `jsi::Value` with
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+  187 |   /** @deprecated Use `runSync` instead. */
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:187:8)
+
+  185 |    * `extractSerializableOrThrow` instead. */
+  186 |   jsi::Value executeSync(jsi::Runtime &rt, const jsi::Value &worklet) const;
+> 187 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+  189 |   /** @deprecated Use `runSync` instead. */
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+
+
+⚠️  (ios/Pods/Headers/Private/RNWorklets/worklets/WorkletRuntime/WorkletRuntime.h:189:8)
+
+  187 |   /** @deprecated Use `runSync` instead. */
+  188 |   jsi::Value executeSync(std::function<jsi::Value(jsi::Runtime &)> &&job) const;
+> 189 |   /** @deprecated Use `runSync` instead. */
+      |        ^ declaration is marked with '@deprecated' command but does not have a deprecation attribute [-Wdocumentation-deprecated-sync]
+  190 |   jsi::Value executeSync(const std::function<jsi::Value(jsi::Runtime &)> &job) const;
+  191 |
+  192 |   /* #endregion */
+
+› Compiling react-native-worklets Pods/RNWorklets » RNRuntimeWorkletDecorator.cpp
+› Compiling react-native-worklets Pods/RNWorklets » PlatformLogger.mm
+› Compiling react-native-worklets Pods/RNWorklets » MemoryManager.cpp
+› Compiling react-native-worklets Pods/RNWorklets » JSScheduler.cpp
+› Compiling react-native-worklets Pods/RNWorklets » JSLogger.cpp
+⚠️  Script has ambiguous dependencies causing it to run on every build.
+   To fix, go to: Xcode » Pods/react-native-maps » Build Phases » '[CP-User] react-native-maps patches'
+   Either: Uncheck "Based on dependency analysis", or select output files to trigger the script
+
+Exited with code: 65
+
+› 2 error(s), and 56 warning(s)
+
+CommandError: Failed to build iOS project. "xcodebuild" exited with error code 65.
+CommandError: Failed to build iOS project. "xcodebuild" exited with error code 65.
+    at Object.buildAsync (/Users/parth/Code/GetOut/GetOut/node_modules/expo/node_modules/@expo/cli/build/src/run/ios/XcodeBuild.js:425:19)
+    at async runIosAsync (/Users/parth/Code/GetOut/GetOut/node_modules/expo/node_modules/@expo/cli/build/src/run/ios/runIosAsync.js:193:29)

@@ -61,7 +61,7 @@ struct BasicDetailsView: View {
                 } label: {
                     HStack {
                         if isSaving { ProgressView().tint(Theme.Colors.textOnDarkPrimary) }
-                        Text(isSaving ? "Creating profile…" : "Continue with iCloud")
+                        Text(isSaving ? "Creating profile…" : "Continue")
                     }
                         .font(Theme.Typography.body().weight(.semibold))
                         .frame(maxWidth: .infinity)

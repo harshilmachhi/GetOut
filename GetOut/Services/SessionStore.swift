@@ -7,7 +7,7 @@ final class SessionStore {
     private enum Keys {
         static let hasCompletedOnboarding = "session.hasCompletedOnboarding"
         static let currentUsername = "session.currentUsername"
-        static let currentCloudKitUserRecordName = "session.currentCloudKitUserRecordName"
+        static let currentSupabaseUserID = "session.currentSupabaseUserID"
     }
 
     var hasCompletedOnboarding: Bool {
@@ -18,13 +18,13 @@ final class SessionStore {
         didSet { UserDefaults.standard.set(currentUsername, forKey: Keys.currentUsername) }
     }
 
-    /// The CloudKit identity is the account key. Usernames are editable display data and must
+    /// The Supabase Auth user ID is the account key. Usernames are editable display data and must
     /// never be used by themselves to decide which local profile is signed in.
-    var currentCloudKitUserRecordName: String {
+    var currentSupabaseUserID: String {
         didSet {
             UserDefaults.standard.set(
-                currentCloudKitUserRecordName,
-                forKey: Keys.currentCloudKitUserRecordName
+                currentSupabaseUserID,
+                forKey: Keys.currentSupabaseUserID
             )
         }
     }
@@ -35,20 +35,19 @@ final class SessionStore {
         let defaults = UserDefaults.standard
         hasCompletedOnboarding = defaults.bool(forKey: Keys.hasCompletedOnboarding)
         currentUsername = defaults.string(forKey: Keys.currentUsername) ?? ""
-        currentCloudKitUserRecordName = defaults.string(
-            forKey: Keys.currentCloudKitUserRecordName
+        currentSupabaseUserID = defaults.string(
+            forKey: Keys.currentSupabaseUserID
         ) ?? ""
 
-        // Builds predating account-scoped sessions only persisted a username. Force one
-        // CloudKit reconciliation before trusting that legacy state.
-        if currentCloudKitUserRecordName.isEmpty {
+        if currentSupabaseUserID.isEmpty {
             hasCompletedOnboarding = false
+            currentUsername = ""
         }
     }
 
     func completeOnboarding(username: String, userRecordName: String) {
         currentUsername = username
-        currentCloudKitUserRecordName = userRecordName
+        currentSupabaseUserID = userRecordName
         hasCompletedOnboarding = true
         isResolvingAccount = false
     }
@@ -58,12 +57,12 @@ final class SessionStore {
         if clearPersistedProfile {
             hasCompletedOnboarding = false
             currentUsername = ""
-            currentCloudKitUserRecordName = ""
+            currentSupabaseUserID = ""
         }
     }
 
     func showOnboarding(for userRecordName: String) {
-        currentCloudKitUserRecordName = userRecordName
+        currentSupabaseUserID = userRecordName
         currentUsername = ""
         hasCompletedOnboarding = false
         isResolvingAccount = false
@@ -76,21 +75,12 @@ final class SessionStore {
     func clearLocalProfileState() {
         hasCompletedOnboarding = false
         currentUsername = ""
-        currentCloudKitUserRecordName = ""
+        currentSupabaseUserID = ""
         isResolvingAccount = false
     }
 
     func currentProfile(in profiles: [Profile]) -> Profile? {
-        if !currentCloudKitUserRecordName.isEmpty,
-           let profile = profiles.first(where: {
-               $0.cloudKitUserRecordName == currentCloudKitUserRecordName
-           }) {
-            return profile
-        }
-
-        // One-release migration fallback for sessions created before the CloudKit identity key
-        // was persisted. Deliberately do not fall back to `profiles.first`.
-        guard !currentUsername.isEmpty else { return nil }
-        return profiles.first(where: { $0.username == currentUsername })
+        guard !currentSupabaseUserID.isEmpty else { return nil }
+        return profiles.first { $0.supabaseUserID == currentSupabaseUserID }
     }
 }

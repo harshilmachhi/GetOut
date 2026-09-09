@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "GetOut",
+    "slug": "getout",
+    "scheme": "getout",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./GetOut/Resources/Assets.xcassets/AppIcon.appiconset/GetOutAppIcon.png",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.parth.getout",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "GetOut uses your location to show great spots near you.",
+        "NSPhotoLibraryUsageDescription": "GetOut lets you choose photos for spots you publish."
+      }
+    },
+    "android": {
+      "package": "com.parth.getout",
+      "adaptiveIcon": {
+        "foregroundImage": "./GetOut/Resources/Assets.xcassets/AppIcon.appiconset/GetOutAppIcon.png",
+        "backgroundColor": "#0a0a0c"
+      },
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "READ_MEDIA_IMAGES"]
+    },
+    "plugins": [
+      "expo-router",
+      ["expo-splash-screen", {"image": "./GetOut/Resources/Assets.xcassets/AppIcon.appiconset/GetOutAppIcon.png", "resizeMode": "contain", "backgroundColor": "#0a0a0c"}],
+      "expo-apple-authentication",
+      ["expo-location", {"locationWhenInUsePermission": "GetOut uses your location to show great spots near you."}],
+      ["expo-image-picker", {"photosPermission": "GetOut lets you choose photos for spots you publish.", "microphonePermission": false}]
+    ],
+    "experiments": {"typedRoutes": true}
+  }
+}

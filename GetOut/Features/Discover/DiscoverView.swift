@@ -37,9 +37,8 @@ struct DiscoverView: View {
             administrativeArea: locationManager.administrativeArea
         )
         return allSpots.filter {
-            // Cloud-backed builds can retain legacy/demo/private cache rows from an older
-            // install. Only a record confirmed in the public database belongs in Discover.
-            (!FeatureFlags.cloudKitDatabaseEnabled || !$0.publicRecordName.isEmpty)
+            // Only a row confirmed in Supabase belongs in public discovery.
+            !$0.publicRecordName.isEmpty
                 && !blocked.contains($0.publisherUserRecordName)
                 && (allowsCannabis || !$0.containsCannabis)
         }
@@ -125,16 +124,21 @@ struct DiscoverView: View {
     }
 
     private func toggleLike(for spot: Spot) {
-        guard let profile = demoProfile else { return }
+        guard let profile = demoProfile, let userID = UUID(uuidString: profile.supabaseUserID) else { return }
 
+        let current: Like?
         if let existing = spot.likes?.first(where: { $0.user?.id == profile.id }) {
             modelContext.delete(existing)
+            current = nil
         } else {
             let like = Like()
             like.user = profile
             like.spot = spot
             modelContext.insert(like)
+            current = like
         }
+        try? modelContext.save()
+        Task { try? await SupabasePrivateDataService.shared.setLike(current, spotID: spot.id, userID: userID) }
     }
 }
 
