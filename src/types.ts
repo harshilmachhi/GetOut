@@ -12,8 +12,19 @@ export interface Spot {
   neighborhood: string; category: Category; rating: number;
   visit_hour: number; visit_weekday: number; photo_urls: string[]; tags: string[];
   contains_cannabis: boolean; country_code: string; administrative_area: string;
+  is_public: boolean; circle_ids: string[];
   created_at: string; profiles?: Pick<Profile, 'username' | 'display_name' | 'avatar_system_image'>;
   ratings?: {stars: number; user_id: string}[];
+}
+
+export interface Circle {
+  id: string; owner_id: string; name: string; description: string; color: string;
+  created_at: string; updated_at: string;
+}
+
+export interface CircleMember {
+  circle_id: string; user_id: string; role: 'owner' | 'admin' | 'member'; joined_at: string;
+  profiles?: Pick<Profile, 'username' | 'display_name' | 'avatar_system_image'>;
 }
 
 export interface Like {id: string; user_id: string; spot_id: string; created_at: string}

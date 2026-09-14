@@ -34,7 +34,7 @@ The CLI requires a Supabase access token and the project database password. Neit
 2. Enable Apple. In Apple Developer, enable Sign in with Apple for App ID `com.parth.getout`, then add `com.parth.getout` to the Supabase Apple provider's Client IDs.
 3. Enable Google. Create a Google OAuth **Web application** client whose authorized redirect URI is `https://wnhafdejexuzebwoglja.supabase.co/auth/v1/callback`, then add its client ID and secret to the Supabase Google provider.
 4. In Authentication → URL Configuration → Redirect URLs, add `getout://login-callback`.
-5. Apply the migrations. They create all tables, RLS policies, grants, indexes, the public `spot-photos` bucket, and `delete_my_account()`.
+5. Apply the migrations. They create all tables, RLS policies, grants, indexes, the public `spot-photos` bucket, the private `circle-spot-photos` bucket, Circle invite RPCs, and `delete_my_account()`.
 6. Confirm the publishable key under Project Settings → API Keys matches `SupabaseConfig.publishableKey`.
 
 The publishable key ships in the app by design. It is not a secret; authorization is enforced through Supabase Auth, grants, and RLS. Never add a secret or service-role key to the app.
@@ -55,3 +55,5 @@ Use two clean simulator installations:
 4. Relaunch and confirm private state is restored from Supabase.
 5. Delete the account in Settings and confirm its Auth user, profile, owned rows, and storage objects are gone.
 6. Run `supabase db reset` in local development to prove the checked-in history recreates the schema.
+
+For Circles, test with three signed-in accounts: an owner, a member, and a non-member. Confirm the member can load a Circle-only spot and its signed photo, the non-member cannot select either row or object, removal hides the spot on the next refresh, expired/revoked links fail, and public + Circle spots remain available publicly.
