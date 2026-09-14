@@ -1,6 +1,6 @@
 import {Ionicons} from '@expo/vector-icons';
 import {router} from 'expo-router';
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Alert, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {SpotCard} from '@/components/SpotCard';
@@ -16,10 +16,22 @@ export default function Discover() {
   const app = useApp();
   const {location, canAccessCannabis} = useCannabisAccess();
   const [category, setCategory] = useState('nearby');
+  const [heroIndex, setHeroIndex] = useState(0);
   const visible = useMemo(() => app.spots.filter(spot => !spot.contains_cannabis || canAccessCannabis), [app.spots, canAccessCannabis]);
-  const ranked = useMemo(() => rankSpots(visible, location, app.profile?.preferred_categories, app.profile?.preferred_tags).filter(item => category === 'nearby' || item.spot.category === category), [visible, location, app.profile, category]);
+  const nearbyRanked = useMemo(() => rankSpots(visible, location, app.profile?.preferred_categories, app.profile?.preferred_tags), [visible, location, app.profile]);
+  const ranked = useMemo(() => nearbyRanked.filter(item => category === 'nearby' || item.spot.category === category), [nearbyRanked, category]);
   const like = (id: string) => app.session ? app.toggleLike(id).catch(error => Alert.alert('Could not update like', String(error))) : router.push('/(tabs)/profile');
-  const hero = ranked[0]?.spot.photo_urls?.[0] ? {uri: ranked[0].spot.photo_urls[0]} : fallbackHero;
+  const nearbyPhotos = useMemo(() => nearbyRanked.flatMap(({spot}) => spot.photo_urls ?? []).filter(Boolean), [nearbyRanked]);
+  useEffect(() => {
+    if (nearbyPhotos.length < 2) return;
+    const timer = setInterval(() => setHeroIndex(current => {
+      const offset = 1 + Math.floor(Math.random() * (nearbyPhotos.length - 1));
+      return (current + offset) % nearbyPhotos.length;
+    }), 9000);
+    return () => clearInterval(timer);
+  }, [nearbyPhotos]);
+  const heroPhoto = nearbyPhotos.length ? nearbyPhotos[heroIndex % nearbyPhotos.length] : undefined;
+  const hero = heroPhoto ? {uri: heroPhoto} : fallbackHero;
 
   return <View style={styles.screen}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
     <ImageBackground source={hero} style={styles.hero} imageStyle={styles.heroImage}>

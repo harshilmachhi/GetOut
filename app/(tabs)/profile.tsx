@@ -9,16 +9,16 @@ import {useApp} from '@/store/AppContext';
 import type {Spot} from '@/types';
 import {colors, radius, spacing} from '@/theme';
 
-type Segment = 'Loved'|'Created'|'Been'|'Cities';
+type Segment = 'Saved'|'Loved'|'Created'|'Been'|'Cities';
 export default function ProfileScreen(){return <AccountGate><ProfileContent/></AccountGate>}
 function ProfileContent(){
-  const app=useApp(); const [segment,setSegment]=useState<Segment>('Loved'); const profile=app.profile!;
-  const owned=app.spots.filter(s=>s.owner_id===profile.id); const loved=app.spots.filter(s=>app.likes.some(x=>x.spot_id===s.id)); const been=app.spots.filter(s=>app.saves.some(x=>x.spot_id===s.id&&x.list==='beenThere'));
-  const cities=useMemo(()=>Object.entries([...owned,...loved,...been].reduce<Record<string,Spot[]>>((a,s)=>{const key=s.city||'Unknown city';if(!a[key])a[key]=[];if(!a[key].some(v=>v.id===s.id))a[key].push(s);return a},{})),[owned,loved,been]);
-  const current=segment==='Loved'?loved:segment==='Created'?owned:been;
+  const app=useApp(); const [segment,setSegment]=useState<Segment>('Saved'); const profile=app.profile!;
+  const owned=app.spots.filter(s=>s.owner_id===profile.id); const saved=app.spots.filter(s=>app.saves.some(x=>x.spot_id===s.id&&x.list==='saved')); const loved=app.spots.filter(s=>app.likes.some(x=>x.spot_id===s.id)); const been=app.spots.filter(s=>app.saves.some(x=>x.spot_id===s.id&&x.list==='beenThere'));
+  const cities=useMemo(()=>Object.entries([...owned,...saved,...loved,...been].reduce<Record<string,Spot[]>>((a,s)=>{const key=s.city||'Unknown city';if(!a[key])a[key]=[];if(!a[key].some(v=>v.id===s.id))a[key].push(s);return a},{})),[owned,saved,loved,been]);
+  const current=segment==='Saved'?saved:segment==='Loved'?loved:segment==='Created'?owned:been;
   return <Screen><Title>Profile</Title><Card style={styles.header}><View style={styles.avatar}><Ionicons name="person" size={38} color={colors.muted}/></View><Text style={styles.name}>{profile.display_name}</Text><Muted>@{profile.username}</Muted>{!!profile.bio&&<Muted style={styles.center}>{profile.bio}</Muted>}<Text style={styles.stat}>{owned.length}</Text><Muted>Spots</Muted></Card>
     <View style={styles.manage}><Pressable onPress={()=>router.push('/circles' as never)} style={styles.manageButton}><Ionicons name="people-outline" size={18} color={colors.green}/><Text style={styles.manageText}>Circles {app.circles.length?`· ${app.circles.length}`:''}</Text></Pressable><Pressable onPress={()=>router.push('/settings')} style={styles.manageButton}><Ionicons name="settings-outline" size={18} color={colors.text}/><Text style={styles.manageText}>Settings</Text></Pressable></View>
-    <View style={styles.segments}>{(['Loved','Created','Been','Cities'] as Segment[]).map(s=><Pressable key={s} onPress={()=>setSegment(s)} style={[styles.segment,segment===s&&styles.segmentActive]}><Text style={[styles.segmentText,segment===s&&styles.segmentTextActive]}>{s}</Text></Pressable>)}</View>
+    <View style={styles.segments}>{(['Saved','Loved','Created','Been','Cities'] as Segment[]).map(s=><Pressable key={s} onPress={()=>setSegment(s)} style={[styles.segment,segment===s&&styles.segmentActive]}><Text style={[styles.segmentText,segment===s&&styles.segmentTextActive]}>{s}</Text></Pressable>)}</View>
     {segment==='Cities'?cities.map(([city,spots])=><Card key={city} style={styles.city}><ImageBackground source={spotImage(spots[0])} style={styles.cityImage}/><View><Text style={styles.tileTitle}>{city}</Text><Muted>{spots.length} spot{spots.length===1?'':'s'}</Muted></View></Card>):<View style={styles.grid}>{current.map(spot=><Pressable key={spot.id} onPress={()=>router.push(`/spot/${spot.id}`)} style={styles.tile}><ImageBackground source={spotImage(spot)} style={styles.tileImage} imageStyle={{borderRadius:radius.control}}><View style={styles.tileShade}/><Text style={styles.tileTitle}>{spot.title}</Text>{segment==='Created'&&<Pressable onPress={()=>Alert.alert(`Delete ${spot.title}?`,'This permanently removes the spot from everywhere it was shared.',[{text:'Cancel'},{text:'Delete',style:'destructive',onPress:()=>app.deleteSpot(spot.id)}])} style={styles.trash}><Ionicons name="trash" size={16} color={colors.text}/></Pressable>}</ImageBackground></Pressable>)}</View>}
     {segment!=='Cities'&&!current.length&&<Muted style={styles.center}>Nothing here yet. Go discover a place worth remembering.</Muted>}
   </Screen>

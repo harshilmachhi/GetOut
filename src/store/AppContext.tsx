@@ -38,7 +38,7 @@ function parseOAuthUrl(url: string) {
   const normalized = url.replace('#', '?');
   const query = normalized.split('?')[1] ?? '';
   const values = new URLSearchParams(query);
-  return {access_token: values.get('access_token'), refresh_token: values.get('refresh_token')};
+  return {code: values.get('code'), access_token: values.get('access_token'), refresh_token: values.get('refresh_token'), error: values.get('error_description') ?? values.get('error')};
 }
 
 function normalizeSpot(row: Record<string, unknown>): Spot {
@@ -109,13 +109,24 @@ export function AppProvider({children}: PropsWithChildren) {
   useEffect(() => { const timer = setTimeout(() => { if (ready) refresh().catch(() => {}); }, 0); return () => clearTimeout(timer); }, [ready, session?.user.id, refresh]);
 
   const signInGoogle = useCallback(async () => {
-    const redirectTo = Linking.createURL('login-callback');
+    // A development URL resolves to localhost on a physical phone. Always return
+    // to the registered app scheme on native builds.
+    const redirectTo = Platform.OS === 'web' ? Linking.createURL('login-callback') : 'getout://login-callback';
     const {data, error} = await supabase.auth.signInWithOAuth({provider: 'google', options: {redirectTo, skipBrowserRedirect: true}});
     if (error) throw error;
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
     if (result.type === 'success') {
       const tokens = parseOAuthUrl(result.url);
-      if (tokens.access_token && tokens.refresh_token) await supabase.auth.setSession({access_token: tokens.access_token, refresh_token: tokens.refresh_token});
+      if (tokens.error) throw new Error(tokens.error);
+      if (tokens.code) {
+        const {error: exchangeError} = await supabase.auth.exchangeCodeForSession(tokens.code);
+        if (exchangeError) throw exchangeError;
+      } else if (tokens.access_token && tokens.refresh_token) {
+        const {error: sessionError} = await supabase.auth.setSession({access_token: tokens.access_token, refresh_token: tokens.refresh_token});
+        if (sessionError) throw sessionError;
+      } else {
+        throw new Error('Google did not return a valid sign-in response. Please try again.');
+      }
     }
   }, []);
 
@@ -183,7 +194,23 @@ export function AppProvider({children}: PropsWithChildren) {
   const unblockUser = async (id: string) => { const userId = requireUser(); const {error} = await supabase.from('user_blocks').delete().eq('blocker_id', userId).eq('blocked_user_id', id); if (error) throw error; setBlocks(x => x.filter(v => v.blocked_user_id !== id)); };
   const reportSpot = async (spot: Spot, reason: string) => { const {error} = await supabase.from('reports').insert({reporter_id: requireUser(), target_id: spot.id, target_owner_id: spot.owner_id, target_kind: 'spot', reason, details: ''}); if (error) throw error; };
   const signOut = async () => { await supabase.auth.signOut(); setProfile(null); setSpots(items => items.filter(spot => spot.is_public)); setLikes([]); setSaves([]); setRatings([]); setTrips([]); setTripStops([]); setBlocks([]); setCircles([]); setCircleMembers([]); };
-  const deleteAccount = async () => { const {error} = await supabase.rpc('delete_my_account'); if (error) throw error; await signOut(); };
+  const deleteAccount = async () => {
+    const userId = requireUser();
+    const {data: ownedSpots, error: spotsError} = await supabase.from('spots').select('id,is_public').eq('owner_id', userId);
+    if (spotsError) throw spotsError;
+    for (const spot of ownedSpots ?? []) {
+      const bucket = spot.is_public ? 'spot-photos' : 'circle-spot-photos';
+      const folder = `${userId}/${spot.id}`;
+      const {data: files, error: listError} = await supabase.storage.from(bucket).list(folder, {limit: 100});
+      if (listError) throw listError;
+      const paths = (files ?? []).filter(file => file.id).map(file => `${folder}/${file.name}`);
+      if (paths.length) {
+        const {error: removeError} = await supabase.storage.from(bucket).remove(paths);
+        if (removeError) throw removeError;
+      }
+    }
+    const {error} = await supabase.rpc('delete_my_account'); if (error) throw error; await signOut();
+  };
 
   const createCircle = async (name: string, description: string) => {
     const row = {id: newId(), owner_id: requireUser(), name: name.trim(), description: description.trim(), color: '#6B9961'};

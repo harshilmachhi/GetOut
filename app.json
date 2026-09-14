@@ -11,6 +11,78 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.parth.getout",
       "usesAppleSignIn": true,
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePreciseLocation",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+              "NSPrivacyCollectedDataTypePurposeProductPersonalization"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeProductInteraction",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+              "NSPrivacyCollectedDataTypePurposeProductPersonalization"
+            ]
+          }
+        ]
+      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "GetOut uses your location to show great spots near you.",
         "NSPhotoLibraryUsageDescription": "GetOut lets you choose photos for spots you publish."
@@ -22,15 +94,44 @@
         "foregroundImage": "./GetOut/Resources/Assets.xcassets/AppIcon.appiconset/GetOutAppIcon.png",
         "backgroundColor": "#0a0a0c"
       },
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "READ_MEDIA_IMAGES"]
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO"
+      ]
     },
     "plugins": [
       "expo-router",
-      ["expo-splash-screen", {"image": "./GetOut/Resources/Assets.xcassets/AppIcon.appiconset/GetOutAppIcon.png", "resizeMode": "contain", "backgroundColor": "#0a0a0c"}],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./GetOut/Resources/Assets.xcassets/AppIcon.appiconset/GetOutAppIcon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0a0a0c"
+        }
+      ],
       "expo-apple-authentication",
-      ["expo-location", {"locationWhenInUsePermission": "GetOut uses your location to show great spots near you."}],
-      ["expo-image-picker", {"photosPermission": "GetOut lets you choose photos for spots you publish.", "microphonePermission": false}]
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GetOut uses your location to show great spots near you."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GetOut lets you choose photos for spots you publish.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-sqlite",
+      "expo-web-browser"
     ],
-    "experiments": {"typedRoutes": true}
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

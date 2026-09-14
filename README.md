@@ -1,6 +1,6 @@
 # GetOut
 
-GetOut helps you discover authentic, non-touristy local spots — hidden rooftops, quiet cafés, and neighborhood gems. Build a social profile, save spots you love, plan collaborative trips with friends, and filter by tags like weed-friendly, quiet, or views. Personalized recommendations surface the places locals actually go.
+GetOut helps you discover authentic, non-touristy local spots — hidden rooftops, quiet cafés, and neighborhood gems. Build a social profile, save spots you love, and filter by tags like weed-friendly, quiet, or views. Personalized recommendations surface the places locals actually go.
 
 ## Getting started
 
