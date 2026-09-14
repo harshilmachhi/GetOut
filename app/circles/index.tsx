@@ -20,7 +20,7 @@ function Circles() {
   };
   return <Screen>
     <View style={styles.heading}><View style={{flex: 1}}><Title>Circles</Title><Muted>Private maps for the people you trust.</Muted></View><Pressable accessibilityLabel="Create a Circle" onPress={() => setShowCreate(true)} style={styles.add}><Ionicons name="add" size={24} color={colors.text}/></Pressable></View>
-    <Card style={styles.privacy}><View style={styles.lock}><Ionicons name="lock-closed" size={20} color={colors.green}/></View><View style={{flex: 1}}><Text style={styles.privacyTitle}>Locations stay inside the Circle</Text><Muted>Only current members can load its spots, photos, or exact coordinates.</Muted></View></Card>
+    <Card style={styles.privacy}><View style={styles.lock}><Ionicons name="lock-closed" size={20} color={colors.green}/></View><View style={{flex: 1}}><Text style={styles.privacyTitle}>Locations stay inside the Circle</Text><Muted>Only current members can see its spots, photos, and exact locations.</Muted></View></Card>
     {!app.circles.length && <View style={styles.empty}><Ionicons name="people-circle-outline" size={68} color={colors.subtle}/><Text style={styles.emptyTitle}>Make a map with your people</Text><Muted style={styles.center}>Create a Circle for close friends, climbing partners, date-night finds—whoever you explore with.</Muted><PrimaryButton title="Create your first Circle" icon="add" onPress={() => setShowCreate(true)}/></View>}
     {app.circles.map(circle => {
       const members = app.circleMembers.filter(member => member.circle_id === circle.id);

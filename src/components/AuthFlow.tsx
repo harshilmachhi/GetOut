@@ -22,7 +22,7 @@ function SignIn() {
   const run = async (action: () => Promise<void>) => { try { setBusy(true); await action(); } catch (e) { Alert.alert('Could not sign in', e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
   return <Screen style={styles.center}>
     <Ionicons name="person-circle" size={66} color={colors.green}/><Title>Your GetOut account</Title>
-    <Muted style={styles.centerText}>{"Sign in to keep your profile and saved spots available when you reinstall or change devices."}</Muted>
+    <Muted style={styles.centerText}>{"Sign in to keep your profile and loved spots available when you reinstall or change devices."}</Muted>
     {Platform.OS === 'ios' && <PrimaryButton title="Continue with Apple" icon="logo-apple" disabled={busy} onPress={() => run(signInApple)}/>}
     <PrimaryButton title="Continue with Google" icon="logo-google" disabled={busy} onPress={() => run(signInGoogle)}/>
     <Muted style={styles.centerText}>By continuing, you agree to the Terms and Privacy Policy.</Muted>

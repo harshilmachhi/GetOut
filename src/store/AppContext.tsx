@@ -7,7 +7,8 @@ import React, {createContext, PropsWithChildren, useCallback, useContext, useEff
 import {Platform} from 'react-native';
 import {supabase} from '@/lib/supabase';
 import {newId} from '@/lib/id';
-import type {Block, Circle, CircleMember, Like, Profile, Rating, Save, Spot, Trip, TripStop} from '@/types';
+import {normalizeTag} from '@/lib/tags';
+import type {BeenThere, Block, Circle, CircleMember, Like, Profile, Rating, Spot, SpotComment, Trip, TripStop} from '@/types';
 
 const CACHE_KEY = 'getout.public-cache.v1';
 
@@ -16,12 +17,15 @@ type SpotDraft = Omit<Spot, 'id' | 'owner_id' | 'created_at' | 'profiles' | 'rat
 
 interface AppValue {
   ready: boolean; refreshing: boolean; session: Session | null; profile: Profile | null;
-  spots: Spot[]; likes: Like[]; saves: Save[]; ratings: Rating[]; trips: Trip[]; tripStops: TripStop[]; blocks: Block[];
+  spots: Spot[]; likes: Like[]; beenThere: BeenThere[]; ratings: Rating[]; trips: Trip[]; tripStops: TripStop[]; blocks: Block[];
   circles: Circle[]; circleMembers: CircleMember[];
   refresh(): Promise<void>; signInGoogle(): Promise<void>; signInApple(): Promise<void>; signOut(): Promise<void>;
   createProfile(draft: ProfileDraft): Promise<void>; updateTaste(categories: string[], tags: string[]): Promise<void>;
-  toggleLike(spotId: string): Promise<void>; toggleSave(spotId: string, list: Save['list']): Promise<void>;
-  setRating(spotId: string, stars: number): Promise<void>; publishSpot(draft: SpotDraft): Promise<Spot>;
+  toggleLike(spotId: string): Promise<void>; toggleBeenThere(spotId: string): Promise<void>;
+  setRating(spotId: string, stars: number): Promise<void>; setReview(spotId: string, stars: number, body: string): Promise<void>;
+  addComment(spotId: string, body: string): Promise<void>; deleteComment(commentId: string): Promise<void>;
+  reportContribution(target: SpotComment | Rating, kind: 'comment' | 'review', reason: string): Promise<void>;
+  publishSpot(draft: SpotDraft): Promise<Spot>;
   deleteSpot(spotId: string): Promise<void>; createTrip(input: Pick<Trip, 'title' | 'summary' | 'start_date' | 'end_date'>): Promise<Trip>;
   updateTrip(trip: Trip): Promise<void>; deleteTrip(id: string): Promise<void>; addStop(tripId: string, spotId: string): Promise<void>;
   updateStop(stop: TripStop): Promise<void>; removeStop(id: string): Promise<void>; blockUser(id: string): Promise<void>;
@@ -62,7 +66,7 @@ export function AppProvider({children}: PropsWithChildren) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [spots, setSpots] = useState<Spot[]>([]);
   const [likes, setLikes] = useState<Like[]>([]);
-  const [saves, setSaves] = useState<Save[]>([]);
+  const [beenThere, setBeenThere] = useState<BeenThere[]>([]);
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [tripStops, setTripStops] = useState<TripStop[]>([]);
@@ -74,8 +78,8 @@ export function AppProvider({children}: PropsWithChildren) {
     setRefreshing(true);
     try {
       const spotSelect = session?.user.id
-        ? '*, profiles(username,display_name,avatar_system_image), ratings(stars,user_id), spot_circles(circle_id)'
-        : '*, profiles(username,display_name,avatar_system_image), ratings(stars,user_id)';
+        ? '*, profiles(username,display_name,avatar_system_image), ratings(id,spot_id,stars,user_id,review_body,created_at,updated_at,profiles(username,display_name,avatar_system_image)), spot_comments(id,spot_id,author_id,body,created_at,updated_at,profiles(username,display_name,avatar_system_image)), spot_circles(circle_id)'
+        : '*, profiles(username,display_name,avatar_system_image), ratings(id,spot_id,stars,user_id,review_body,created_at,updated_at,profiles(username,display_name,avatar_system_image)), spot_comments(id,spot_id,author_id,body,created_at,updated_at,profiles(username,display_name,avatar_system_image))';
       const publicResult = await supabase.from('spots').select(spotSelect).order('created_at', {ascending: false}).limit(250);
       if (publicResult.error) throw publicResult.error;
       const visibleSpots = await signPrivatePhotos((publicResult.data ?? []).map(row => normalizeSpot(row as unknown as Record<string, unknown>)), !!session?.user.id);
@@ -83,9 +87,9 @@ export function AppProvider({children}: PropsWithChildren) {
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(visibleSpots.filter(spot => spot.is_public)));
       if (!session?.user.id) { setProfile(null); setCircles([]); setCircleMembers([]); return; }
       const userId = session.user.id;
-      const [profileResult, likesResult, savesResult, ratingsResult, tripsResult, stopsResult, blocksResult, circlesResult, membersResult] = await Promise.all([
+      const [profileResult, likesResult, beenThereResult, ratingsResult, tripsResult, stopsResult, blocksResult, circlesResult, membersResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        supabase.from('likes').select('*'), supabase.from('saves').select('*'),
+        supabase.from('likes').select('*'), supabase.from('been_there').select('*'),
         supabase.from('ratings').select('*').eq('user_id', userId), supabase.from('trips').select('*').order('start_date'),
         supabase.from('trip_stops').select('*').order('sort_order'), supabase.from('user_blocks').select('*'),
         supabase.from('circles').select('*').order('created_at'),
@@ -93,7 +97,7 @@ export function AppProvider({children}: PropsWithChildren) {
       ]);
       if (profileResult.error) throw profileResult.error;
       setProfile(profileResult.data as Profile | null);
-      setLikes((likesResult.data ?? []) as Like[]); setSaves((savesResult.data ?? []) as Save[]);
+      setLikes((likesResult.data ?? []) as Like[]); setBeenThere((beenThereResult.data ?? []) as BeenThere[]);
       setRatings((ratingsResult.data ?? []) as Rating[]); setTrips((tripsResult.data ?? []) as Trip[]);
       setTripStops((stopsResult.data ?? []) as TripStop[]); setBlocks((blocksResult.data ?? []) as Block[]);
       setCircles((circlesResult.data ?? []) as Circle[]); setCircleMembers((membersResult.data ?? []) as CircleMember[]);
@@ -142,31 +146,53 @@ export function AppProvider({children}: PropsWithChildren) {
   const createProfile = async (draft: ProfileDraft) => {
     const id = requireUser();
     const row = {...draft, id, username: draft.username.trim().toLowerCase(), avatar_system_image: 'person.fill', preferred_categories: [], preferred_tags: []};
-    const {error} = await supabase.from('profiles').upsert(row); if (error) throw error; await refresh();
+    const {error} = await supabase.from('profiles').upsert(row);
+    if (error) {
+      if (error.code === '23505') throw new Error('That username is already taken. Please choose another one.');
+      throw new Error(error.message);
+    }
+    await refresh();
   };
   const updateTaste = async (categories: string[], tags: string[]) => {
-    const id = requireUser(); const {error} = await supabase.from('profiles').update({preferred_categories: categories, preferred_tags: tags}).eq('id', id); if (error) throw error; await refresh();
+    const id = requireUser(); const {error} = await supabase.from('profiles').update({preferred_categories: categories, preferred_tags: [...new Set(tags.map(normalizeTag).filter(Boolean))]}).eq('id', id); if (error) throw error; await refresh();
   };
   const toggleLike = async (spotId: string) => {
     const userId = requireUser(); const current = likes.find(x => x.spot_id === spotId);
     if (current) { setLikes(x => x.filter(v => v.id !== current.id)); const {error} = await supabase.from('likes').delete().eq('user_id', userId).eq('spot_id', spotId); if (error) throw error; }
     else { const row = {id: newId(), user_id: userId, spot_id: spotId, created_at: new Date().toISOString()}; setLikes(x => [...x, row]); const {error} = await supabase.from('likes').upsert(row, {onConflict: 'user_id,spot_id'}); if (error) throw error; }
   };
-  const toggleSave = async (spotId: string, list: Save['list']) => {
-    const userId = requireUser(); const current = saves.find(x => x.spot_id === spotId && x.list === list);
-    if (current) { setSaves(x => x.filter(v => v.id !== current.id)); const {error} = await supabase.from('saves').delete().eq('user_id', userId).eq('spot_id', spotId).eq('list', list); if (error) throw error; }
-    else { const row = {id: newId(), user_id: userId, spot_id: spotId, list, created_at: new Date().toISOString()}; setSaves(x => [...x, row]); const {error} = await supabase.from('saves').upsert(row, {onConflict: 'user_id,spot_id,list'}); if (error) throw error; }
+  const toggleBeenThere = async (spotId: string) => {
+    const userId = requireUser(); const current = beenThere.find(x => x.spot_id === spotId);
+    if (current) { setBeenThere(x => x.filter(v => v.id !== current.id)); const {error} = await supabase.from('been_there').delete().eq('user_id', userId).eq('spot_id', spotId); if (error) throw error; }
+    else { const row = {id: newId(), user_id: userId, spot_id: spotId, created_at: new Date().toISOString()}; setBeenThere(x => [...x, row]); const {error} = await supabase.from('been_there').upsert(row, {onConflict: 'user_id,spot_id'}); if (error) throw error; }
   };
   const setRating = async (spotId: string, stars: number) => {
     const userId = requireUser(); const current = ratings.find(x => x.spot_id === spotId);
-    if (!stars) { setRatings(x => x.filter(v => v.spot_id !== spotId)); const {error} = await supabase.from('ratings').delete().eq('user_id', userId).eq('spot_id', spotId); if (error) throw error; }
-    else { const row = {id: current?.id ?? newId(), user_id: userId, spot_id: spotId, stars, created_at: current?.created_at ?? new Date().toISOString()}; setRatings(x => [...x.filter(v => v.spot_id !== spotId), row]); const {error} = await supabase.from('ratings').upsert(row, {onConflict: 'user_id,spot_id'}); if (error) throw error; }
+    if (!stars) { setRatings(x => x.filter(v => v.spot_id !== spotId)); const {error} = await supabase.from('ratings').delete().eq('user_id', userId).eq('spot_id', spotId); if (error) throw error; await refresh(); }
+    else {
+      const {error} = await supabase.from('ratings').upsert({user_id: userId, spot_id: spotId, stars, review_body: current?.review_body ?? ''}, {onConflict: 'user_id,spot_id'}); if (error) throw error;
+      await refresh();
+    }
   };
+  const setReview = async (spotId: string, stars: number, body: string) => {
+    const userId = requireUser(); const reviewBody = body.trim();
+    if (stars < 1 || stars > 5) throw new Error('Choose a star rating for your review.');
+    if (reviewBody.length < 3 || reviewBody.length > 2000) throw new Error('Reviews must be between 3 and 2,000 characters.');
+    const {error} = await supabase.from('ratings').upsert({user_id: userId, spot_id: spotId, stars, review_body: reviewBody}, {onConflict: 'user_id,spot_id'}); if (error) throw error;
+    await refresh();
+  };
+  const addComment = async (spotId: string, body: string) => {
+    const authorId = requireUser(); const trimmed = body.trim();
+    if (!trimmed.length || trimmed.length > 1000) throw new Error('Comments must be between 1 and 1,000 characters.');
+    const {error} = await supabase.from('spot_comments').insert({id: newId(), spot_id: spotId, author_id: authorId, body: trimmed}); if (error) throw error;
+    await refresh();
+  };
+  const deleteComment = async (commentId: string) => { const {error} = await supabase.from('spot_comments').delete().eq('id', commentId).eq('author_id', requireUser()); if (error) throw error; await refresh(); };
   const publishSpot = async (draft: SpotDraft) => {
     const ownerId = requireUser(); const id = newId(); const photo_urls: string[] = [];
     if (!draft.isPublic && !draft.circleIds.length) throw new Error('Choose Public or at least one Circle.');
     const {circleIds, isPublic, photoUris, ...spotDraft} = draft;
-    const initialRow = {...spotDraft, id, owner_id: ownerId, is_public: isPublic, photo_urls: [], created_at: new Date().toISOString()};
+    const initialRow = {...spotDraft, tags: [...new Set(spotDraft.tags.map(normalizeTag).filter(Boolean))], id, owner_id: ownerId, is_public: isPublic, photo_urls: [], created_at: new Date().toISOString()};
     const inserted = await supabase.from('spots').insert(initialRow).select('*').single();
     if (inserted.error) throw inserted.error;
     if (circleIds.length) {
@@ -193,7 +219,11 @@ export function AppProvider({children}: PropsWithChildren) {
   const blockUser = async (blocked_user_id: string) => { const row = {blocker_id: requireUser(), blocked_user_id}; const {error} = await supabase.from('user_blocks').upsert(row, {onConflict: 'blocker_id,blocked_user_id'}); if (error) throw error; await refresh(); };
   const unblockUser = async (id: string) => { const userId = requireUser(); const {error} = await supabase.from('user_blocks').delete().eq('blocker_id', userId).eq('blocked_user_id', id); if (error) throw error; setBlocks(x => x.filter(v => v.blocked_user_id !== id)); };
   const reportSpot = async (spot: Spot, reason: string) => { const {error} = await supabase.from('reports').insert({reporter_id: requireUser(), target_id: spot.id, target_owner_id: spot.owner_id, target_kind: 'spot', reason, details: ''}); if (error) throw error; };
-  const signOut = async () => { await supabase.auth.signOut(); setProfile(null); setSpots(items => items.filter(spot => spot.is_public)); setLikes([]); setSaves([]); setRatings([]); setTrips([]); setTripStops([]); setBlocks([]); setCircles([]); setCircleMembers([]); };
+  const reportContribution = async (target: SpotComment | Rating, kind: 'comment' | 'review', reason: string) => {
+    const ownerId = kind === 'comment' ? (target as SpotComment).author_id : (target as Rating).user_id;
+    const {error} = await supabase.from('reports').insert({reporter_id: requireUser(), target_id: target.id, target_owner_id: ownerId, target_kind: kind, reason, details: ''}); if (error) throw error;
+  };
+  const signOut = async () => { await supabase.auth.signOut(); setProfile(null); setSpots(items => items.filter(spot => spot.is_public)); setLikes([]); setBeenThere([]); setRatings([]); setTrips([]); setTripStops([]); setBlocks([]); setCircles([]); setCircleMembers([]); };
   const deleteAccount = async () => {
     const userId = requireUser();
     const {data: ownedSpots, error: spotsError} = await supabase.from('spots').select('id,is_public').eq('owner_id', userId);
@@ -214,7 +244,8 @@ export function AppProvider({children}: PropsWithChildren) {
 
   const createCircle = async (name: string, description: string) => {
     const row = {id: newId(), owner_id: requireUser(), name: name.trim(), description: description.trim(), color: '#6B9961'};
-    const {data, error} = await supabase.from('circles').insert(row).select('*').single(); if (error) throw error;
+    const {data, error} = await supabase.from('circles').insert(row).select('*').single();
+    if (error) throw new Error(error.message);
     await refresh(); return data as Circle;
   };
   const deleteCircle = async (id: string) => { const {error} = await supabase.from('circles').delete().eq('id', id); if (error) throw error; await refresh(); };
@@ -224,7 +255,7 @@ export function AppProvider({children}: PropsWithChildren) {
   const leaveCircle = async (circleId: string) => removeCircleMember(circleId, requireUser());
   const revokeCircleInvites = async (circleId: string) => { const {error} = await supabase.rpc('revoke_circle_invites', {target_circle: circleId}); if (error) throw error; };
 
-  const value: AppValue = {ready, refreshing, session, profile, spots: spots.filter(s => !blocks.some(b => b.blocked_user_id === s.owner_id)), likes, saves, ratings, trips, tripStops, blocks, circles, circleMembers, refresh, signInGoogle, signInApple, signOut, createProfile, updateTaste, toggleLike, toggleSave, setRating, publishSpot, deleteSpot, createTrip, updateTrip, deleteTrip, addStop, updateStop, removeStop, blockUser, unblockUser, reportSpot, deleteAccount, createCircle, deleteCircle, createCircleInvite, acceptCircleInvite, removeCircleMember, leaveCircle, revokeCircleInvites};
+  const value: AppValue = {ready, refreshing, session, profile, spots: spots.filter(s => !blocks.some(b => b.blocked_user_id === s.owner_id)), likes, beenThere, ratings, trips, tripStops, blocks, circles, circleMembers, refresh, signInGoogle, signInApple, signOut, createProfile, updateTaste, toggleLike, toggleBeenThere, setRating, setReview, addComment, deleteComment, reportContribution, publishSpot, deleteSpot, createTrip, updateTrip, deleteTrip, addStop, updateStop, removeStop, blockUser, unblockUser, reportSpot, deleteAccount, createCircle, deleteCircle, createCircleInvite, acceptCircleInvite, removeCircleMember, leaveCircle, revokeCircleInvites};
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
