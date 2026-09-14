@@ -8,7 +8,7 @@ import {Platform} from 'react-native';
 import {supabase} from '@/lib/supabase';
 import {newId} from '@/lib/id';
 import {normalizeTag} from '@/lib/tags';
-import type {BeenThere, Block, Circle, CircleMember, Like, Profile, Rating, Spot, SpotComment, Trip, TripStop} from '@/types';
+import type {BeenThere, Block, Circle, CircleMember, Like, Profile, Rating, Spot, Trip, TripStop} from '@/types';
 
 const CACHE_KEY = 'getout.public-cache.v1';
 
@@ -23,8 +23,7 @@ interface AppValue {
   createProfile(draft: ProfileDraft): Promise<void>; updateTaste(categories: string[], tags: string[]): Promise<void>;
   toggleLike(spotId: string): Promise<void>; toggleBeenThere(spotId: string): Promise<void>;
   setRating(spotId: string, stars: number): Promise<void>; setReview(spotId: string, stars: number, body: string): Promise<void>;
-  addComment(spotId: string, body: string): Promise<void>; deleteComment(commentId: string): Promise<void>;
-  reportContribution(target: SpotComment | Rating, kind: 'comment' | 'review', reason: string): Promise<void>;
+  reportReview(target: Rating, reason: string): Promise<void>;
   publishSpot(draft: SpotDraft): Promise<Spot>;
   deleteSpot(spotId: string): Promise<void>; createTrip(input: Pick<Trip, 'title' | 'summary' | 'start_date' | 'end_date'>): Promise<Trip>;
   updateTrip(trip: Trip): Promise<void>; deleteTrip(id: string): Promise<void>; addStop(tripId: string, spotId: string): Promise<void>;
@@ -78,8 +77,8 @@ export function AppProvider({children}: PropsWithChildren) {
     setRefreshing(true);
     try {
       const spotSelect = session?.user.id
-        ? '*, profiles(username,display_name,avatar_system_image), ratings(id,spot_id,stars,user_id,review_body,created_at,updated_at,profiles(username,display_name,avatar_system_image)), spot_comments(id,spot_id,author_id,body,created_at,updated_at,profiles(username,display_name,avatar_system_image)), spot_circles(circle_id)'
-        : '*, profiles(username,display_name,avatar_system_image), ratings(id,spot_id,stars,user_id,review_body,created_at,updated_at,profiles(username,display_name,avatar_system_image)), spot_comments(id,spot_id,author_id,body,created_at,updated_at,profiles(username,display_name,avatar_system_image))';
+        ? '*, profiles(username,display_name,avatar_system_image), ratings(id,spot_id,stars,user_id,review_body,created_at,updated_at,profiles(username,display_name,avatar_system_image)), spot_circles(circle_id)'
+        : '*, profiles(username,display_name,avatar_system_image), ratings(id,spot_id,stars,user_id,review_body,created_at,updated_at,profiles(username,display_name,avatar_system_image))';
       const publicResult = await supabase.from('spots').select(spotSelect).order('created_at', {ascending: false}).limit(250);
       if (publicResult.error) throw publicResult.error;
       const visibleSpots = await signPrivatePhotos((publicResult.data ?? []).map(row => normalizeSpot(row as unknown as Record<string, unknown>)), !!session?.user.id);
@@ -181,13 +180,6 @@ export function AppProvider({children}: PropsWithChildren) {
     const {error} = await supabase.from('ratings').upsert({user_id: userId, spot_id: spotId, stars, review_body: reviewBody}, {onConflict: 'user_id,spot_id'}); if (error) throw error;
     await refresh();
   };
-  const addComment = async (spotId: string, body: string) => {
-    const authorId = requireUser(); const trimmed = body.trim();
-    if (!trimmed.length || trimmed.length > 1000) throw new Error('Comments must be between 1 and 1,000 characters.');
-    const {error} = await supabase.from('spot_comments').insert({id: newId(), spot_id: spotId, author_id: authorId, body: trimmed}); if (error) throw error;
-    await refresh();
-  };
-  const deleteComment = async (commentId: string) => { const {error} = await supabase.from('spot_comments').delete().eq('id', commentId).eq('author_id', requireUser()); if (error) throw error; await refresh(); };
   const publishSpot = async (draft: SpotDraft) => {
     const ownerId = requireUser(); const id = newId(); const photo_urls: string[] = [];
     if (!draft.isPublic && !draft.circleIds.length) throw new Error('Choose Public or at least one Circle.');
@@ -219,9 +211,8 @@ export function AppProvider({children}: PropsWithChildren) {
   const blockUser = async (blocked_user_id: string) => { const row = {blocker_id: requireUser(), blocked_user_id}; const {error} = await supabase.from('user_blocks').upsert(row, {onConflict: 'blocker_id,blocked_user_id'}); if (error) throw error; await refresh(); };
   const unblockUser = async (id: string) => { const userId = requireUser(); const {error} = await supabase.from('user_blocks').delete().eq('blocker_id', userId).eq('blocked_user_id', id); if (error) throw error; setBlocks(x => x.filter(v => v.blocked_user_id !== id)); };
   const reportSpot = async (spot: Spot, reason: string) => { const {error} = await supabase.from('reports').insert({reporter_id: requireUser(), target_id: spot.id, target_owner_id: spot.owner_id, target_kind: 'spot', reason, details: ''}); if (error) throw error; };
-  const reportContribution = async (target: SpotComment | Rating, kind: 'comment' | 'review', reason: string) => {
-    const ownerId = kind === 'comment' ? (target as SpotComment).author_id : (target as Rating).user_id;
-    const {error} = await supabase.from('reports').insert({reporter_id: requireUser(), target_id: target.id, target_owner_id: ownerId, target_kind: kind, reason, details: ''}); if (error) throw error;
+  const reportReview = async (target: Rating, reason: string) => {
+    const {error} = await supabase.from('reports').insert({reporter_id: requireUser(), target_id: target.id, target_owner_id: target.user_id, target_kind: 'review', reason, details: ''}); if (error) throw error;
   };
   const signOut = async () => { await supabase.auth.signOut(); setProfile(null); setSpots(items => items.filter(spot => spot.is_public)); setLikes([]); setBeenThere([]); setRatings([]); setTrips([]); setTripStops([]); setBlocks([]); setCircles([]); setCircleMembers([]); };
   const deleteAccount = async () => {
@@ -255,7 +246,7 @@ export function AppProvider({children}: PropsWithChildren) {
   const leaveCircle = async (circleId: string) => removeCircleMember(circleId, requireUser());
   const revokeCircleInvites = async (circleId: string) => { const {error} = await supabase.rpc('revoke_circle_invites', {target_circle: circleId}); if (error) throw error; };
 
-  const value: AppValue = {ready, refreshing, session, profile, spots: spots.filter(s => !blocks.some(b => b.blocked_user_id === s.owner_id)), likes, beenThere, ratings, trips, tripStops, blocks, circles, circleMembers, refresh, signInGoogle, signInApple, signOut, createProfile, updateTaste, toggleLike, toggleBeenThere, setRating, setReview, addComment, deleteComment, reportContribution, publishSpot, deleteSpot, createTrip, updateTrip, deleteTrip, addStop, updateStop, removeStop, blockUser, unblockUser, reportSpot, deleteAccount, createCircle, deleteCircle, createCircleInvite, acceptCircleInvite, removeCircleMember, leaveCircle, revokeCircleInvites};
+  const value: AppValue = {ready, refreshing, session, profile, spots: spots.filter(s => !blocks.some(b => b.blocked_user_id === s.owner_id)), likes, beenThere, ratings, trips, tripStops, blocks, circles, circleMembers, refresh, signInGoogle, signInApple, signOut, createProfile, updateTaste, toggleLike, toggleBeenThere, setRating, setReview, reportReview, publishSpot, deleteSpot, createTrip, updateTrip, deleteTrip, addStop, updateStop, removeStop, blockUser, unblockUser, reportSpot, deleteAccount, createCircle, deleteCircle, createCircleInvite, acceptCircleInvite, removeCircleMember, leaveCircle, revokeCircleInvites};
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 

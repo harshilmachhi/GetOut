@@ -14,16 +14,12 @@ export interface Spot {
   contains_cannabis: boolean; country_code: string; administrative_area: string;
   is_public: boolean; circle_ids: string[];
   created_at: string; profiles?: Pick<Profile, 'username' | 'display_name' | 'avatar_system_image'>;
-  ratings?: SpotRating[]; spot_comments?: SpotComment[];
+  ratings?: SpotRating[];
 }
 
 export type CommunityProfile = Pick<Profile, 'username' | 'display_name' | 'avatar_system_image'>;
 export interface SpotRating {
   id: string; spot_id: string; stars: number; user_id: string; review_body: string;
-  created_at: string; updated_at: string; profiles?: CommunityProfile;
-}
-export interface SpotComment {
-  id: string; spot_id: string; author_id: string; body: string;
   created_at: string; updated_at: string; profiles?: CommunityProfile;
 }
 

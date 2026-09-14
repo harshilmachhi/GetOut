@@ -8,9 +8,7 @@ import {spotImage} from '@/components/SpotCard';
 import {Card, Chip, Field, IconButton, Muted, PrimaryButton, Screen, SectionTitle} from '@/components/ui';
 import {useApp} from '@/store/AppContext';
 import {colors, radius, spacing} from '@/theme';
-import type {Rating, SpotComment, SpotRating} from '@/types';
-
-type ComposerMode = 'comment' | 'review';
+import type {Rating, SpotRating} from '@/types';
 
 export default function SpotDetail() {
   const {id} = useLocalSearchParams<{id: string}>();
@@ -18,15 +16,12 @@ export default function SpotDetail() {
   const spot = app.spots.find(item => item.id === id);
   const myRating = app.ratings.find(item => item.spot_id === id);
   const [safety, setSafety] = useState(false);
-  const [composerMode, setComposerMode] = useState<ComposerMode>('comment');
-  const [comment, setComment] = useState('');
   const [review, setReview] = useState(myRating?.review_body ?? '');
   const [reviewStars, setReviewStars] = useState(myRating?.stars ?? 0);
   const [submitting, setSubmitting] = useState(false);
 
   const blockedIds = useMemo(() => new Set(app.blocks.map(block => block.blocked_user_id)), [app.blocks]);
   const reviews = useMemo(() => (spot?.ratings ?? []).filter(item => item.review_body && !blockedIds.has(item.user_id)).sort(newestFirst), [blockedIds, spot?.ratings]);
-  const comments = useMemo(() => (spot?.spot_comments ?? []).filter(item => !blockedIds.has(item.author_id)).sort(newestFirst), [blockedIds, spot?.spot_comments]);
 
   if (!spot) return <Screen><Muted>This spot is no longer available.</Muted></Screen>;
 
@@ -54,13 +49,6 @@ export default function SpotDetail() {
     }
     app.setRating(spot.id, clear ? 0 : stars).catch(showError('Could not update rating'));
   });
-  const submitComment = async () => {
-    if (!app.session) return router.push('/(tabs)/profile');
-    if (!comment.trim()) return;
-    try { setSubmitting(true); await app.addComment(spot.id, comment); setComment(''); }
-    catch (error) { showError('Could not post comment')(error); }
-    finally { setSubmitting(false); }
-  };
   const submitReview = async () => {
     if (!app.session) return router.push('/(tabs)/profile');
     try {
@@ -70,20 +58,15 @@ export default function SpotDetail() {
     } catch (error) { showError('Could not save review')(error); }
     finally { setSubmitting(false); }
   };
-  const beginReview = () => { setReview(myRating?.review_body ?? ''); setReviewStars(myRating?.stars ?? 0); setComposerMode('review'); };
   const deleteReview = () => Alert.alert('Delete your review?', 'Your star rating and written review will both be removed.', [
     {text: 'Cancel', style: 'cancel'},
     {text: 'Delete', style: 'destructive', onPress: () => app.setRating(spot.id, 0).catch(showError('Could not delete review'))},
   ]);
-  const deleteComment = (target: SpotComment) => Alert.alert('Delete comment?', undefined, [
-    {text: 'Cancel', style: 'cancel'},
-    {text: 'Delete', style: 'destructive', onPress: () => app.deleteComment(target.id).catch(showError('Could not delete comment'))},
-  ]);
-  const moderate = (target: SpotComment | SpotRating, kind: 'comment' | 'review') => {
-    const ownerId = kind === 'comment' ? (target as SpotComment).author_id : (target as SpotRating).user_id;
+  const moderate = (target: SpotRating) => {
+    const ownerId = target.user_id;
     const username = target.profiles?.username ?? 'this person';
-    Alert.alert(`${kind === 'comment' ? 'Comment' : 'Review'} options`, undefined, [
-      {text: 'Report', onPress: () => app.reportContribution(target as SpotComment | Rating, kind, 'inappropriate').then(() => Alert.alert('Report sent', 'Thanks for helping keep GetOut safe.')).catch(showError('Could not send report'))},
+    Alert.alert('Review options', undefined, [
+      {text: 'Report', onPress: () => app.reportReview(target as Rating, 'inappropriate').then(() => Alert.alert('Report sent', 'Thanks for helping keep GetOut safe.')).catch(showError('Could not send report'))},
       {text: `Block @${username}`, style: 'destructive', onPress: () => app.blockUser(ownerId).catch(showError('Could not block user'))},
       {text: 'Cancel', style: 'cancel'},
     ]);
@@ -105,22 +88,18 @@ export default function SpotDetail() {
 
         <SectionTitle>About this spot</SectionTitle><Text style={styles.details}>{spot.details || 'No description was provided for this spot.'}</Text><View style={styles.tags}>{spot.tags.map(tag => <Chip key={tag} label={`#${tag}`}/>)}</View>
 
-        <View style={styles.communityHeader}><View><SectionTitle>Community</SectionTitle><Muted>{reviews.length} review{reviews.length === 1 ? '' : 's'} · {comments.length} comment{comments.length === 1 ? '' : 's'}</Muted></View>{!spot.is_public && <View style={styles.privateBadge}><Ionicons name="lock-closed" size={12} color={colors.green}/><Text style={styles.privateText}>Circle members</Text></View>}</View>
+        <View style={styles.communityHeader}><View><SectionTitle>Reviews</SectionTitle><Muted>{reviews.length} written review{reviews.length === 1 ? '' : 's'}</Muted></View>{!spot.is_public && <View style={styles.privateBadge}><Ionicons name="lock-closed" size={12} color={colors.green}/><Text style={styles.privateText}>Circle members</Text></View>}</View>
         <Card style={styles.composer}>
-          <View style={styles.segment}><SegmentButton label="Comment" selected={composerMode === 'comment'} onPress={() => setComposerMode('comment')}/><SegmentButton label={myRating?.review_body ? 'Edit review' : 'Write review'} selected={composerMode === 'review'} onPress={beginReview}/></View>
-          {app.session ? composerMode === 'comment' ? <>
-            <Field multiline maxLength={1000} value={comment} onChangeText={setComment} placeholder="Add to the conversation…" accessibilityLabel="Comment"/>
-            <View style={styles.submitRow}><Muted>{comment.trim().length}/1000</Muted><View style={styles.submitButton}><PrimaryButton title={submitting ? 'Posting…' : 'Post comment'} disabled={submitting || !comment.trim()} onPress={submitComment}/></View></View>
-          </> : <>
+          {app.session ? <>
+            <Text style={styles.label}>{myRating?.review_body ? 'Edit your review' : 'Write a review'}</Text>
             <Text style={styles.label}>Your rating</Text><StarPicker value={reviewStars} onChange={setReviewStars}/>
             <Field multiline maxLength={2000} value={review} onChangeText={setReview} placeholder="What should others know about this spot?" accessibilityLabel="Written review"/>
             <View style={styles.submitRow}><Muted>{review.trim().length}/2000</Muted><View style={styles.submitButton}><PrimaryButton title={submitting ? 'Saving…' : myRating?.review_body ? 'Update review' : 'Post review'} disabled={submitting || reviewStars === 0 || review.trim().length < 3} onPress={submitReview}/></View></View>
-          </> : <PrimaryButton title="Sign in to join the conversation" icon="person" onPress={() => router.push('/(tabs)/profile')}/>}
+          </> : <PrimaryButton title="Sign in to write a review" icon="person" onPress={() => router.push('/(tabs)/profile')}/>}
         </Card>
 
-        {!!reviews.length && <><Text style={styles.subheading}>Reviews</Text>{reviews.map(item => <CommunityCard key={item.id} profile={item.profiles} date={item.updated_at} stars={item.stars} body={item.review_body} own={item.user_id === app.profile?.id} onMore={() => item.user_id === app.profile?.id ? deleteReview() : moderate(item, 'review')}/>)}</>}
-        {!!comments.length && <><Text style={styles.subheading}>Comments</Text>{comments.map(item => <CommunityCard key={item.id} profile={item.profiles} date={item.updated_at} body={item.body} own={item.author_id === app.profile?.id} onMore={() => item.author_id === app.profile?.id ? deleteComment(item) : moderate(item, 'comment')}/>)}</>}
-        {!reviews.length && !comments.length && <Card style={styles.emptyCommunity}><Ionicons name="chatbubbles-outline" size={28} color={colors.muted}/><Muted>Be the first to share something helpful about this spot.</Muted></Card>}
+        {!!reviews.length && reviews.map(item => <CommunityCard key={item.id} profile={item.profiles} date={item.updated_at} stars={item.stars} body={item.review_body} own={item.user_id === app.profile?.id} onMore={() => item.user_id === app.profile?.id ? deleteReview() : moderate(item)}/>)}
+        {!reviews.length && <Card style={styles.emptyCommunity}><Ionicons name="star-outline" size={28} color={colors.muted}/><Muted>Be the first to write a helpful review of this spot.</Muted></Card>}
 
         <SectionTitle>Location</SectionTitle><MapView scrollEnabled={false} pitchEnabled={false} style={styles.map} initialRegion={{latitude: spot.latitude, longitude: spot.longitude, latitudeDelta: .012, longitudeDelta: .012}}><Marker coordinate={spot}/></MapView><Muted>{spot.address || `${spot.latitude.toFixed(5)}, ${spot.longitude.toFixed(5)}`}</Muted><PrimaryButton title="Get Directions" icon="navigate" onPress={directions}/>
         {spot.profiles && <><SectionTitle>Shared by</SectionTitle><Card style={styles.owner}><View style={styles.ownerAvatar}><Ionicons name="person" size={24} color={colors.muted}/></View><View><Text style={styles.label}>{spot.profiles.display_name}</Text><Muted>@{spot.profiles.username}</Muted></View></Card></>}
@@ -136,7 +115,6 @@ export default function SpotDetail() {
 function newestFirst(a: {updated_at: string}, b: {updated_at: string}) { return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(); }
 function showError(title: string) { return (error: unknown) => Alert.alert(title, error instanceof Error ? error.message : String(error)); }
 function StarPicker({value, onChange}: {value: number; onChange(value: number): void}) { return <View style={styles.stars}>{[1, 2, 3, 4, 5].map(star => <Pressable key={star} accessibilityLabel={`${star} stars`} accessibilityRole="button" onPress={() => onChange(star)} hitSlop={6}><Ionicons name={star <= value ? 'star' : 'star-outline'} size={31} color={colors.orange}/></Pressable>)}</View>; }
-function SegmentButton({label, selected, onPress}: {label: string; selected: boolean; onPress(): void}) { return <Pressable accessibilityRole="button" accessibilityState={{selected}} onPress={onPress} style={[styles.segmentButton, selected && styles.segmentSelected]}><Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{label}</Text></Pressable>; }
 function Action({icon, label, active, onPress}: {icon: keyof typeof Ionicons.glyphMap; label: string; active?: boolean; onPress(): void}) { return <Pressable accessibilityRole="button" onPress={onPress} style={styles.action}><Ionicons name={icon} size={23} color={active ? colors.green : colors.text}/><Text style={[styles.actionText, active && {color: colors.green}]}>{label}</Text></Pressable>; }
 function CommunityCard({profile, date, stars, body, own, onMore}: {profile?: {display_name: string; username: string}; date: string; stars?: number; body: string; own: boolean; onMore(): void}) { return <Card style={styles.communityCard}><View style={styles.entryHeader}><View style={styles.entryIdentity}><View style={styles.smallAvatar}><Ionicons name="person" size={17} color={colors.muted}/></View><View style={styles.identityText}><Text numberOfLines={1} style={styles.entryName}>{profile?.display_name ?? 'GetOut member'}</Text><Muted>@{profile?.username ?? 'member'} · {new Date(date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</Muted></View></View><Pressable accessibilityLabel={own ? 'Delete' : 'More options'} accessibilityRole="button" hitSlop={10} onPress={onMore}><Ionicons name={own ? 'trash-outline' : 'ellipsis-horizontal'} size={19} color={own ? colors.red : colors.muted}/></Pressable></View>{stars !== undefined && <View style={styles.inlineStars}>{[1, 2, 3, 4, 5].map(star => <Ionicons key={star} name={star <= stars ? 'star' : 'star-outline'} size={15} color={colors.orange}/>)}</View>}<Text style={styles.entryBody}>{body}</Text></Card>; }
 
@@ -146,7 +124,7 @@ const styles = StyleSheet.create({
   body: {padding: spacing.lg, gap: spacing.md}, audience: {alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.surface2, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6}, audienceText: {color: colors.text, fontSize: 12, fontWeight: '800'},
   title: {fontFamily: 'serif', fontSize: 34, fontWeight: '800', color: colors.cream}, meta: {flexDirection: 'row', alignItems: 'center', gap: 5}, metaText: {color: colors.text, fontWeight: '800'}, rating: {padding: spacing.md, gap: spacing.sm}, label: {color: colors.text, fontSize: 16, fontWeight: '700'}, stars: {flexDirection: 'row', justifyContent: 'space-between'},
   actionRow: {flexDirection: 'row', gap: spacing.sm}, action: {flex: 1, alignItems: 'center', gap: 6, paddingVertical: 12, borderRadius: radius.control, backgroundColor: colors.surface}, actionText: {fontSize: 12, color: colors.text, fontWeight: '700'}, details: {color: colors.text, fontSize: 16, lineHeight: 24}, tags: {flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm},
-  communityHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm}, privateBadge: {flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.pill, backgroundColor: 'rgba(107,153,97,.16)', paddingHorizontal: 10, paddingVertical: 7}, privateText: {fontSize: 11, color: colors.green, fontWeight: '700'}, composer: {padding: spacing.md, gap: spacing.md}, segment: {flexDirection: 'row', backgroundColor: colors.surface2, borderRadius: radius.control, padding: 3}, segmentButton: {flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 11}, segmentSelected: {backgroundColor: colors.surfaceElevated}, segmentText: {color: colors.muted, fontWeight: '700'}, segmentTextSelected: {color: colors.text}, submitRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md}, submitButton: {minWidth: 142},
+  communityHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm}, privateBadge: {flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.pill, backgroundColor: 'rgba(107,153,97,.16)', paddingHorizontal: 10, paddingVertical: 7}, privateText: {fontSize: 11, color: colors.green, fontWeight: '700'}, composer: {padding: spacing.md, gap: spacing.md}, submitRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md}, submitButton: {minWidth: 142},
   subheading: {fontSize: 16, color: colors.text, fontWeight: '800', marginTop: spacing.xs}, communityCard: {padding: spacing.md, gap: spacing.sm}, entryHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}, entryIdentity: {flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm}, identityText: {flex: 1}, smallAvatar: {width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center'}, entryName: {color: colors.text, fontWeight: '700'}, inlineStars: {flexDirection: 'row', gap: 2}, entryBody: {color: colors.text, fontSize: 15, lineHeight: 22}, emptyCommunity: {padding: spacing.lg, alignItems: 'center', gap: spacing.sm},
   map: {height: 210, borderRadius: radius.card}, owner: {padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 12}, ownerAvatar: {width: 48, height: 48, borderRadius: 24, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center'},
   backdrop: {flex: 1, backgroundColor: 'rgba(0,0,0,.7)', justifyContent: 'flex-end', padding: spacing.lg}, menu: {padding: spacing.md}, menuRow: {paddingVertical: 15, borderBottomColor: colors.faint, borderBottomWidth: StyleSheet.hairlineWidth}, menuText: {color: colors.text}, danger: {color: colors.red, fontWeight: '700'},
